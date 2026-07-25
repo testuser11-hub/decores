@@ -1,6 +1,10 @@
 import { supabase, isSupabaseConfigured } from './src/config/supabase.js';
 import { createBooking as createSupabaseBooking } from './src/services/crud.js';
 
+// Resolve all asset paths dynamically for Vite production bundling
+const images = import.meta.glob('./src/assets/**/*', { eager: true, import: 'default' });
+const resolveAsset = (path) => images[path] || path;
+
 const categories = [
   { slug: 'wedding', name: 'Weddings', image: './src/assets/hero-wedding.jpg', blurb: 'Grand mandaps, floral stages & sangeet nights.' },
   { slug: 'birthday', name: 'Birthdays', image: './src/assets/cat-birthday.jpg', blurb: 'First birthdays, milestone bashes, themed setups.' },
@@ -33,6 +37,10 @@ const galleryItems = [
   { image: './src/assets/prop-arch.jpg', category: 'wedding', title: 'Circular Floral Arch' },
   { image: './src/assets/gallery-haldi-jhoola.png', category: 'haldi', title: 'Marigold Jhoola Swing' },
 ];
+
+// Resolve the images within categories and galleryItems in place
+categories.forEach(item => { if (item.image) item.image = resolveAsset(item.image); });
+galleryItems.forEach(item => { if (item.image) item.image = resolveAsset(item.image); });
 
 const packages = [
   { tier: 'Essential', price: '₹ 15,000 onwards', highlights: ['Balloon arch or backdrop drape', 'Floral centerpiece (1)', 'Name / age foil letters', 'On-site setup & teardown'], accent: false },
@@ -76,13 +84,15 @@ function loadProducts() {
       { id: 'rustic-arch', name: 'Rustic Wooden Arch', image: './src/assets/prop-rustic-arch.png', price: 4800, tag: 'Backdrop', eventCategory: 'wedding' },
       { id: 'chandelier', name: 'Luxury Crystal Chandelier', image: './src/assets/prop-chandelier.png', price: 2500, tag: 'Lighting', eventCategory: 'all' },
     ];
-    window.localStorage.setItem('sky_decors_products_v2', JSON.stringify(defaults));
-    return defaults;
+    const resolvedDefaults = defaults.map(item => ({ ...item, image: resolveAsset(item.image) }));
+    window.localStorage.setItem('sky_decors_products_v2', JSON.stringify(resolvedDefaults));
+    return resolvedDefaults;
   }
   try {
     const parsed = JSON.parse(raw);
     return parsed.map((item) => ({
       ...item,
+      image: resolveAsset(item.image),
       eventCategory: item.eventCategory || 'all',
     }));
   } catch {
@@ -1106,7 +1116,7 @@ function initAdminPage() {
           </div>
           <div class="field-group" style="display: flex; flex-direction: column;">
             <label class="field-label" style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;" for="prop-image">Image URL</label>
-            <input class="form-input" style="padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem;" id="prop-image" name="image" type="text" value="${editingProp ? editingProp.image : './src/assets/prop-arch.jpg'}" required />
+            <input class="form-input" style="padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem;" id="prop-image" name="image" type="text" value="${editingProp ? editingProp.image : resolveAsset('./src/assets/prop-arch.jpg')}" required />
           </div>
           <div class="field-group full" style="display: flex; gap: 1rem; margin-top: 1rem;">
             <button type="submit" class="btn btn-gold" style="padding: 0.6rem 1.5rem; border-radius: 999px;">${editingProp ? 'Save Changes' : 'Add Prop'}</button>
