@@ -13,13 +13,40 @@ export async function getProductBySlug(slug) {
 }
 
 export async function createContactMessage(payload) {
-  const { data, error } = await supabase.from('contact_messages').insert(payload).select().single();
+  const { data, error } = await supabase.from('contact_messages').insert(payload);
   if (error) throw error;
   return data;
 }
 
 export async function createBooking(payload) {
-  const { data, error } = await supabase.from('orders').insert(payload).select().single();
+  const { data, error } = await supabase.from('orders').insert(payload);
+  if (error) throw error;
+  return data;
+}
+
+export async function getBookings() {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function updateBookingStatus(id, status) {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status })
+    .eq('id', id);
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteBooking(id) {
+  const { data, error } = await supabase
+    .from('orders')
+    .delete()
+    .eq('id', id);
   if (error) throw error;
   return data;
 }

@@ -28,7 +28,11 @@ function createStubClient() {
   };
 }
 
-const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+const isConfigured = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'))
+);
 
 export const supabase = isConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
