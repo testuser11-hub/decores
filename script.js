@@ -1,5 +1,12 @@
 import { supabase, isSupabaseConfigured } from './src/config/supabase.js';
-import { createBooking as createSupabaseBooking } from './src/services/crud.js';
+import { 
+  createBooking as createSupabaseBooking,
+  getBookings as getSupabaseBookings,
+  updateBookingStatus as updateSupabaseBookingStatus,
+  deleteBooking as deleteSupabaseBooking
+} from './src/services/crud.js';
+
+let currentUser = null;
 
 // Resolve all asset paths dynamically for Vite production bundling
 const images = import.meta.glob('./src/assets/**/*', { eager: true, import: 'default' });
@@ -163,6 +170,11 @@ function renderShell(content) {
             const active = item.href === 'index.html' ? getCurrentPage() === 'home' : getCurrentPage() === item.href.replace('.html', '');
             return `<a href="${item.href}" class="${active ? 'active' : ''}">${item.label}</a>`;
           }).join('')}
+          ${currentUser 
+            ? `<span style="font-size: 0.85rem; color: var(--muted); font-weight: 500;">Hi, ${currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email.split('@')[0]}</span>
+               <a href="#" id="nav-logout-btn" class="nav-auth-btn" style="color: var(--burgundy); font-weight: 600; cursor: pointer;">Sign Out</a>`
+            : `<a href="login.html" class="nav-auth-btn" style="color: var(--muted); font-weight: 500; cursor: pointer;">Sign In</a>`
+          }
         </nav>
       </div>
     </header>
@@ -177,6 +189,22 @@ function renderShell(content) {
 
   initMobileNav();
   attachPageHandlers();
+
+  const navLogoutBtn = document.getElementById('nav-logout-btn');
+  if (navLogoutBtn) {
+    navLogoutBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.auth.signOut();
+          window.sessionStorage.removeItem('sky_admin_auth_v1');
+          window.location.reload();
+        } catch (err) {
+          console.warn("Logout error:", err);
+        }
+      }
+    });
+  }
 }
 
 function renderHomePage() {
@@ -469,6 +497,23 @@ function renderContactPage() {
 }
 
 function renderBookingPage() {
+  if (!currentUser) {
+    return `
+      <section class="page-section" style="min-height: 60vh; display: flex; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 3rem; border-radius: 1.5rem; border: 1px solid var(--border); box-shadow: var(--shadow); max-width: 500px; width: 100%; text-align: center;">
+          <span class="brand-mark" style="margin: 0 auto 1.5rem auto;">✦</span>
+          <h2 style="font-family: 'Playfair Display', serif; color: var(--burgundy); margin-bottom: 0.75rem; font-size: 2.2rem;">Login Required</h2>
+          <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 2.2rem; line-height: 1.6;">
+            To book an event decoration and keep track of your requests, please sign in with your Google account.
+          </p>
+          <a href="login.html" id="booking-login-redirect-btn" class="btn btn-gold" style="width: 100%; padding: 0.8rem; font-weight: 600; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;">
+            Sign In with Google
+          </a>
+        </div>
+      </section>
+    `;
+  }
+
   return `
     <section class="page-section">
       <div class="container">
@@ -487,7 +532,7 @@ function renderBookingPage() {
           <div class="form-grid">
             <div class="field-group">
               <label class="field-label" for="name">Your name</label>
-              <input class="form-input" id="name" name="name" type="text" />
+              <input class="form-input" id="name" name="name" type="text" value="${currentUser.user_metadata?.full_name || ''}" />
               <p class="field-error" data-error-for="name"></p>
             </div>
             <div class="field-group">
@@ -497,7 +542,7 @@ function renderBookingPage() {
             </div>
             <div class="field-group full">
               <label class="field-label" for="email">Email</label>
-              <input class="form-input" id="email" name="email" type="email" />
+              <input class="form-input" id="email" name="email" type="email" value="${currentUser.email || ''}" />
               <p class="field-error" data-error-for="email"></p>
             </div>
             <div class="field-group">
@@ -555,7 +600,29 @@ function renderBookingPage() {
   `;
 }
 
-function renderAdminPage() {
+function renderLoginPage() {
+  return `
+    <section class="page-section" style="min-height: 70vh; display: flex; align-items: center; justify-content: center;">
+      <div class="auth-card" style="background: white; padding: 2.5rem; border-radius: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow); max-width: 420px; width: 100%; text-align: center;">
+        <span class="brand-mark" style="margin: 0 auto 1.5rem auto;">✦</span>
+        <h2 style="font-family: 'Playfair Display', serif; color: var(--burgundy); margin-bottom: 0.5rem; font-size: 2rem;">Sign In</h2>
+        <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5;">Sign in with Google to book event decorations and track your requests.</p>
+        
+        <button id="google-login-btn" class="btn" style="width: 100%; border: 1px solid var(--border); color: var(--text); background: white; display: flex; align-items: center; justify-content: center; gap: 0.75rem; font-weight: 600; border-radius: 999px; cursor: pointer; padding: 0.75rem 1rem; font-size: 0.95rem; transition: background 0.2s;">
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.844 2.078-1.796 2.717v2.258h2.909c1.702-1.567 2.683-3.874 2.683-6.616z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.185l-2.91-2.258c-.805.54-1.836.859-3.046.859-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.93 6.002 18 9 18z" fill="#34A853"/>
+            <path d="M3.964 10.705A5.41 5.41 0 0 1 3.6 9c0-.594.102-1.17.284-1.705V4.963H.957A8.993 8.993 0 0 0 0 9c0 1.543.391 3.013.957 4.332l3.007-2.627z" fill="#FBBC05"/>
+            <path d="M9 3.579c1.32 0 2.508.454 3.44 1.345l2.582-2.58C13.46 1.055 11.427 0 9 0 6.002 0 2.438 2.07 1.047 5.068l3.007 2.332c.708-2.127 2.692-3.711 5.036-3.711z" fill="#EA4335"/>
+          </svg>
+          Sign in with Google
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderAdminPage(bookingsList = null) {
   const authed = window.sessionStorage.getItem('sky_admin_auth_v1') === '1';
   const activeTab = window.sessionStorage.getItem('sky_admin_tab') || 'dashboard';
   const bookingFilter = window.sessionStorage.getItem('sky_admin_filter') || 'all';
@@ -591,7 +658,7 @@ function renderAdminPage() {
     `;
   }
 
-  const bookings = loadBookings();
+  const bookings = bookingsList || loadBookings();
   const pending = bookings.filter((item) => item.status === 'pending').length;
   const confirmed = bookings.filter((item) => item.status === 'confirmed').length;
   const month = new Date().getMonth();
@@ -618,8 +685,8 @@ function renderAdminPage() {
               <tbody>
                 ${bookings.slice(0, 5).map((item) => `
                   <tr>
-                    <td>${item.name}<br /><small>${item.email}</small></td>
-                    <td>${item.eventType}<br /><small>${item.eventDate}</small></td>
+                    <td>${item.name || '—'}<br /><small>${item.email || '—'}</small></td>
+                    <td>${item.eventType || '—'}<br /><small>${item.eventDate || '—'}</small></td>
                     <td>${statusBadge(item.status)}</td>
                   </tr>
                 `).join('')}
@@ -642,9 +709,14 @@ function renderAdminPage() {
             <tbody>
               ${filterBookings(bookings, bookingFilter).map((item) => `
                 <tr>
-                  <td>${item.name}<br /><small>${item.email}<br />${item.phone}</small></td>
-                  <td>${item.eventType}<br /><small>${item.venue}</small><br /><small>${item.package || '—'}</small></td>
-                  <td>${item.budget}</td>
+                  <td>${item.name || '—'}<br /><small>${item.email || '—'}<br />${item.phone || '—'}</small></td>
+                  <td>
+                    ${item.eventType || '—'}<br />
+                    <small>📍 ${item.venue || '—'}</small><br />
+                    <small>📦 ${item.package || '—'}</small>
+                    ${item.notes ? `<br /><small style="color: var(--muted); font-style: italic; display: block; margin-top: 0.25rem;">📝 "${item.notes}"</small>` : ''}
+                  </td>
+                  <td>${item.budget || '—'}</td>
                   <td>${statusBadge(item.status)}</td>
                   <td>
                     <div class="admin-actions">
@@ -767,6 +839,31 @@ function loadBookings() {
   }
 }
 
+async function fetchBookings() {
+  if (isSupabaseConfigured) {
+    try {
+      const data = await getSupabaseBookings();
+      return data.map(order => {
+        let bookingData = {};
+        try {
+          bookingData = JSON.parse(order.notes || '{}');
+        } catch (e) {
+          bookingData = { notes: order.notes };
+        }
+        return {
+          id: order.id,
+          createdAt: order.created_at || new Date().toISOString(),
+          status: order.status || 'pending',
+          ...bookingData,
+        };
+      });
+    } catch (e) {
+      console.warn('Failed to fetch bookings from Supabase, falling back to local storage:', e);
+    }
+  }
+  return loadBookings();
+}
+
 function saveBookings(list) {
   window.localStorage.setItem('sky_decors_bookings_v1', JSON.stringify(list));
 }
@@ -805,12 +902,28 @@ async function persistBooking(data) {
   return false;
 }
 
-function updateBookingStatus(id, status) {
+async function updateBookingStatus(id, status) {
+  if (isSupabaseConfigured) {
+    try {
+      await updateSupabaseBookingStatus(id, status);
+      return;
+    } catch (error) {
+      console.warn('Failed to update booking status in Supabase:', error);
+    }
+  }
   const list = loadBookings().map((item) => (item.id === id ? { ...item, status } : item));
   saveBookings(list);
 }
 
-function deleteBooking(id) {
+async function deleteBooking(id) {
+  if (isSupabaseConfigured) {
+    try {
+      await deleteSupabaseBooking(id);
+      return;
+    } catch (error) {
+      console.warn('Failed to delete booking from Supabase:', error);
+    }
+  }
   const list = loadBookings().filter((item) => item.id !== id);
   saveBookings(list);
 }
@@ -856,6 +969,10 @@ function attachPageHandlers() {
 
   if (page === 'booking') {
     initBookingPage();
+  }
+
+  if (page === 'login') {
+    initLoginPage();
   }
 
   if (page === 'admin') {
@@ -945,8 +1062,17 @@ function initPropsPage() {
 }
 
 function initBookingPage() {
+  const loginRedirectBtn = document.getElementById('booking-login-redirect-btn');
+  if (loginRedirectBtn) {
+    loginRedirectBtn.addEventListener('click', () => {
+      sessionStorage.setItem('sky_auth_redirect', window.location.href);
+    });
+    return;
+  }
+
   const form = document.getElementById('booking-form');
   const success = document.getElementById('booking-success');
+  if (!form) return;
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -990,6 +1116,29 @@ function initBookingPage() {
     success.classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
+}
+
+function initLoginPage() {
+  const loginBtn = document.getElementById('google-login-btn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', async () => {
+      if (!isSupabaseConfigured) {
+        alert("Supabase is not configured. Please define VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable Google Login.");
+        return;
+      }
+      const redirectUrl = sessionStorage.getItem('sky_auth_redirect') || (window.location.origin + '/booking.html');
+      try {
+        await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: redirectUrl
+          }
+        });
+      } catch (err) {
+        alert("Google Login error: " + err.message);
+      }
+    });
+  }
 }
 
 function initAdminPage() {
@@ -1049,17 +1198,17 @@ function initAdminPage() {
   });
 
   document.querySelectorAll('[data-booking-action]').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const id = button.dataset.bookingId;
       const action = button.dataset.bookingAction;
       if (action === 'delete') {
         if (window.confirm('Delete this enquiry?')) {
-          deleteBooking(id);
+          await deleteBooking(id);
           renderPage();
         }
         return;
       }
-      updateBookingStatus(id, action);
+      await updateBookingStatus(id, action);
       renderPage();
     });
   });
@@ -1265,7 +1414,7 @@ function initAdminPage() {
   });
 }
 
-function renderPage() {
+async function renderPage() {
   const page = getCurrentPage();
   if (page === 'home') {
     renderShell(renderHomePage());
@@ -1281,8 +1430,27 @@ function renderPage() {
     renderShell(renderContactPage());
   } else if (page === 'booking') {
     renderShell(renderBookingPage());
+  } else if (page === 'login') {
+    renderShell(renderLoginPage());
   } else if (page === 'admin') {
-    renderShell(renderAdminPage());
+    const authed = window.sessionStorage.getItem('sky_admin_auth_v1') === '1';
+    if (!authed) {
+      renderShell(renderAdminPage());
+    } else {
+      renderShell(`
+        <section class="page-section">
+          <div class="container" style="text-align: center; padding: 4rem 0;">
+            <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--burgundy); animation: spin 1s linear infinite; margin: 0 auto 1rem auto;"></div>
+            <p style="font-size: 1.1rem; color: var(--muted); font-family: 'Inter', sans-serif;">Loading enquiries...</p>
+          </div>
+        </section>
+        <style>
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+      `);
+      const bookings = await fetchBookings();
+      renderShell(renderAdminPage(bookings));
+    }
   } else {
     renderShell(renderHomePage());
   }
@@ -1292,8 +1460,12 @@ async function checkSupabaseSession() {
   if (isSupabaseConfigured) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      currentUser = session ? session.user : null;
       if (session) {
-        window.sessionStorage.setItem('sky_admin_auth_v1', '1');
+        // Secure admin check - only grant admin access automatically if their email is hello@skydecors.in
+        if (session.user.email === 'hello@skydecors.in') {
+          window.sessionStorage.setItem('sky_admin_auth_v1', '1');
+        }
       }
     } catch (e) {
       console.warn("Failed checking Supabase session:", e);

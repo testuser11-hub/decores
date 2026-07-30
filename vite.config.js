@@ -11,6 +11,7 @@ export default defineConfig({
         booking: resolve(__dirname, 'booking.html'),
         contact: resolve(__dirname, 'contact.html'),
         gallery: resolve(__dirname, 'gallery.html'),
+        login: resolve(__dirname, 'login.html'),
         props: resolve(__dirname, 'props.html'),
         services: resolve(__dirname, 'services.html'),
       },
