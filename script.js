@@ -170,6 +170,10 @@ function renderShell(content) {
             const active = item.href === 'index.html' ? getCurrentPage() === 'home' : getCurrentPage() === item.href.replace('.html', '');
             return `<a href="${item.href}" class="${active ? 'active' : ''}">${item.label}</a>`;
           }).join('')}
+          ${currentUser && currentUser.email === 'mugeshkumartest@gmail.com'
+            ? `<a href="admin.html" class="${getCurrentPage() === 'admin' ? 'active' : ''}">Admin Dashboard</a>`
+            : ''
+          }
           ${currentUser 
             ? `<span style="font-size: 0.85rem; color: var(--muted); font-weight: 500;">Hi, ${currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email.split('@')[0]}</span>
                <a href="#" id="nav-logout-btn" class="nav-auth-btn" style="color: var(--burgundy); font-weight: 600; cursor: pointer;">Sign Out</a>`
@@ -623,27 +627,20 @@ function renderLoginPage() {
 }
 
 function renderAdminPage(bookingsList = null) {
-  const authed = window.sessionStorage.getItem('sky_admin_auth_v1') === '1';
+  const authed = window.sessionStorage.getItem('sky_admin_auth_v1') === '1' && currentUser && currentUser.email === 'mugeshkumartest@gmail.com';
   const activeTab = window.sessionStorage.getItem('sky_admin_tab') || 'dashboard';
   const bookingFilter = window.sessionStorage.getItem('sky_admin_filter') || 'all';
   const propFilter = window.sessionStorage.getItem('sky_admin_prop_filter') || 'all';
 
   if (!authed) {
     return `
-      <section class="page-section">
-        <div class="auth-card">
-          <p class="eyebrow">Admin access</p>
-          <h2>Sky Admin</h2>
-          <p class="page-intro">Enter the admin PIN to continue.</p>
-          <form id="admin-auth-form">
-            <div class="field-group">
-              <label class="field-label" for="admin-pin">PIN</label>
-              <input class="form-input" id="admin-pin" name="pin" type="password" placeholder="••••••" />
-            </div>
-            <button class="btn btn-gold" style="margin-top: 1rem; width: 100%;">Sign in with PIN</button>
-          </form>
-          <div style="margin-top: 1.2rem; text-align: center; color: var(--muted); font-size: 0.85rem; font-family: sans-serif;">— OR —</div>
-          <button id="admin-google-login-btn" class="btn btn-outline" style="margin-top: 1.2rem; width: 100%; border: 1px solid var(--border); color: var(--text); background: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 500; border-radius: 999px; cursor: pointer; padding: 0.6rem 1rem;">
+      <section class="page-section" style="min-height: 70vh; display: flex; align-items: center; justify-content: center;">
+        <div class="auth-card" style="background: white; padding: 2.5rem; border-radius: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow); max-width: 420px; width: 100%; text-align: center;">
+          <span class="brand-mark" style="margin: 0 auto 1.5rem auto;">✦</span>
+          <h2 style="font-family: 'Playfair Display', serif; color: var(--burgundy); margin-bottom: 0.5rem; font-size: 2rem;">Admin Access</h2>
+          <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5;">Please sign in with the authorized Google admin account to access the dashboard.</p>
+          
+          <button id="admin-google-login-btn" class="btn" style="width: 100%; border: 1px solid var(--border); color: var(--text); background: white; display: flex; align-items: center; justify-content: center; gap: 0.75rem; font-weight: 600; border-radius: 999px; cursor: pointer; padding: 0.75rem 1rem; font-size: 0.95rem; transition: background 0.2s;">
             <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.844 2.078-1.796 2.717v2.258h2.909c1.702-1.567 2.683-3.874 2.683-6.616z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.467-.806 5.956-2.185l-2.91-2.258c-.805.54-1.836.859-3.046.859-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.93 6.002 18 9 18z" fill="#34A853"/>
@@ -652,7 +649,6 @@ function renderAdminPage(bookingsList = null) {
             </svg>
             Sign in with Google
           </button>
-          <p class="form-help" style="margin-top: 1.5rem;">Demo PIN: sky2026</p>
         </div>
       </section>
     `;
@@ -1142,18 +1138,6 @@ function initLoginPage() {
 }
 
 function initAdminPage() {
-  const authForm = document.getElementById('admin-auth-form');
-  if (authForm) {
-    authForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const pin = new FormData(authForm).get('pin');
-      if (String(pin).trim() === 'sky2026') {
-        window.sessionStorage.setItem('sky_admin_auth_v1', '1');
-        renderPage();
-      }
-    });
-  }
-
   const googleLoginBtn = document.getElementById('admin-google-login-btn');
   if (googleLoginBtn) {
     googleLoginBtn.addEventListener('click', async () => {
@@ -1433,7 +1417,12 @@ async function renderPage() {
   } else if (page === 'login') {
     renderShell(renderLoginPage());
   } else if (page === 'admin') {
-    const authed = window.sessionStorage.getItem('sky_admin_auth_v1') === '1';
+    // Admin Route Protection: Redirect any non-admin users to the home page
+    if (currentUser && currentUser.email !== 'mugeshkumartest@gmail.com') {
+      window.location.replace('index.html');
+      return;
+    }
+    const authed = window.sessionStorage.getItem('sky_admin_auth_v1') === '1' && currentUser && currentUser.email === 'mugeshkumartest@gmail.com';
     if (!authed) {
       renderShell(renderAdminPage());
     } else {
@@ -1461,11 +1450,21 @@ async function checkSupabaseSession() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       currentUser = session ? session.user : null;
-      if (session) {
-        // Secure admin check - only grant admin access automatically if their email is hello@skydecors.in
-        if (session.user.email === 'hello@skydecors.in') {
+      if (session && session.user) {
+        if (session.user.email === 'mugeshkumartest@gmail.com') {
           window.sessionStorage.setItem('sky_admin_auth_v1', '1');
+          
+          // Automatic login redirection to Admin Dashboard if they are currently on login or booking pages
+          const currentPage = getCurrentPage();
+          if (currentPage === 'login' || currentPage === 'booking') {
+            window.location.replace('admin.html');
+          }
+        } else {
+          // Explicitly clear admin session for other users
+          window.sessionStorage.removeItem('sky_admin_auth_v1');
         }
+      } else {
+        window.sessionStorage.removeItem('sky_admin_auth_v1');
       }
     } catch (e) {
       console.warn("Failed checking Supabase session:", e);
