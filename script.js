@@ -382,7 +382,6 @@ const faqs = [
 
 const navItems = [
   { href: 'index.html', label: 'Home' },
-  { href: 'gallery.html', label: 'Gallery' },
   { href: 'services.html', label: 'Services' },
   { href: 'props.html', label: 'Props' },
   { href: 'about.html', label: 'About' },
