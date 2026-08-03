@@ -389,7 +389,6 @@ const faqs = [
 const navItems = [
   { href: 'index.html', label: 'Home' },
   { href: 'services.html', label: 'Services' },
-  { href: 'props.html', label: 'Props' },
   { href: 'about.html', label: 'About' },
   { href: 'contact.html', label: 'Contact' },
   { href: 'booking.html', label: 'Book Now' },
@@ -440,6 +439,13 @@ function renderShell(content, skipHandlers = false) {
           <span class="brand-mark">✦</span>
           <span>Sky Decors &amp; Props</span>
         </a>
+        
+        <div class="nav-search-wrapper">
+          <span style="position: absolute; left: 0.75rem; color: var(--muted); font-size: 0.9rem; pointer-events: none;">🔍</span>
+          <input type="text" id="nav-search-input" class="nav-search-input" placeholder="Search props..." />
+          <button type="button" id="nav-search-clear" class="nav-search-clear">×</button>
+        </div>
+
         <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
@@ -476,6 +482,7 @@ function renderShell(content, skipHandlers = false) {
   `;
 
   initMobileNav();
+  initGlobalSearch();
   if (!skipHandlers) {
     attachPageHandlers();
   }
@@ -619,6 +626,24 @@ function renderHomePage() {
               <p>${item.answer}</p>
             </div>
           `).join('')}
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" id="home-catalog-section" style="background: #faf7f2; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div class="container">
+        <div class="section-heading">
+          <p class="eyebrow">Rental Catalog</p>
+          <h2>Bespoke Props for Hire.</h2>
+          <p>Rent individual props to elevate your celebration. Prices are per day, subject to availability.</p>
+        </div>
+
+        <div class="filter-row" id="home-catalog-filter-row" style="margin-bottom: 2rem;">
+          ${EVENT_CATEGORIES.map((cat) => `<button class="filter-chip ${cat.slug === 'all' ? 'active' : ''}" type="button" data-catalog-filter="${cat.slug}">${cat.name}</button>`).join('')}
+        </div>
+
+        <div class="card-grid" id="home-prop-grid">
+          <!-- Dynamic products list will be injected here -->
         </div>
       </div>
     </section>
@@ -1234,12 +1259,12 @@ function initMobileNav() {
 function attachPageHandlers() {
   const page = getCurrentPage();
 
-  if (page === 'gallery') {
-    initGalleryPage();
+  if (page === 'home') {
+    initHomePage();
   }
 
-  if (page === 'props') {
-    initPropsPage();
+  if (page === 'gallery') {
+    initGalleryPage();
   }
 
   if (page === 'booking') {
@@ -1292,93 +1317,140 @@ function initGalleryPage() {
   renderGallery();
 }
 
-function initPropsPage() {
-  const grid = document.getElementById('prop-grid');
-  const filters = Array.from(document.querySelectorAll('.filter-chip'));
-  const searchInput = document.getElementById('prop-search-input');
-  const searchClear = document.getElementById('prop-search-clear');
+function initGlobalSearch() {
+  const searchInput = document.getElementById('nav-search-input');
+  const clearBtn = document.getElementById('nav-search-clear');
+  if (!searchInput) return;
 
-  let activeFilter = 'all';
-  let searchQuery = '';
-
-  function renderProps() {
-    const allProducts = loadProducts();
-    const items = allProducts.filter((item) => {
-      const matchesCategory = activeFilter === 'all' || item.eventCategory === activeFilter || item.eventCategory === 'all';
-      const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery);
-      return matchesCategory && matchesSearch;
-    });
-      
-    if (items.length === 0) {
-      grid.innerHTML = `
-        <div class="no-results">
-          <p>No props found matching "${searchQuery}"</p>
-          <button type="button" class="btn btn-outline" style="border-color: var(--burgundy); color: var(--burgundy); background: transparent;" id="clear-search-btn">Clear Search</button>
-        </div>
-      `;
-      const clearBtn = document.getElementById('clear-search-btn');
-      if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-          if (searchInput) {
-            searchInput.value = '';
-            searchQuery = '';
-            if (searchClear) searchClear.classList.add('hidden');
-            renderProps();
-          }
-        });
-      }
-      return;
+  searchInput.addEventListener('input', () => {
+    const val = searchInput.value.trim();
+    if (clearBtn) {
+      clearBtn.style.display = val ? 'flex' : 'none';
     }
 
-    grid.innerHTML = items.map((item) => `
-      <article class="prop-card">
-        <a href="product-details.html?id=${item.id}" class="card-image" style="display:block; height: 240px; overflow:hidden;">
-          <img src="${item.image}" alt="${item.name}" />
-        </a>
-        <div class="card-body">
-          <div class="eyebrow">${item.tag} ${item.eventCategory !== 'all' ? `• ${EVENT_CATEGORIES.find(c => c.slug === item.eventCategory)?.name || item.eventCategory}` : ''}</div>
-          <h3><a href="product-details.html?id=${item.id}">${item.name}</a></h3>
-          <p>₹ ${item.price.toLocaleString('en-IN')} / day</p>
-          <a href="booking.html?product=${encodeURIComponent(item.name)}" class="btn btn-burgundy" style="margin-top: 1rem; width: 100%; text-align: center;">Book Now</a>
-        </div>
-      </article>
-    `).join('');
-  }
-
-  filters.forEach((button) => {
-    button.addEventListener('click', () => {
-      activeFilter = button.dataset.filter || 'all';
-      filters.forEach((chip) => chip.classList.toggle('active', chip === button));
-      renderProps();
-    });
+    const currentPage = getCurrentPage();
+    if (currentPage === 'home') {
+      renderHomeProps();
+    }
   });
 
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      searchQuery = e.target.value.toLowerCase().trim();
-      if (searchClear) {
-        if (searchQuery) {
-          searchClear.classList.remove('hidden');
-        } else {
-          searchClear.classList.add('hidden');
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const val = searchInput.value.trim();
+      const currentPage = getCurrentPage();
+      if (currentPage !== 'home') {
+        window.location.href = `index.html?search=${encodeURIComponent(val)}`;
+      }
+    }
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      clearBtn.style.display = 'none';
+      
+      const currentPage = getCurrentPage();
+      if (currentPage === 'home') {
+        renderHomeProps();
+      }
+    });
+  }
+}
+
+window.activeHomeCategory = 'all';
+window.activeHomeSearch = '';
+
+function renderHomePropsList(items) {
+  const grid = document.getElementById('home-prop-grid');
+  if (!grid) return;
+
+  if (items.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 3rem 0;">
+        <p style="font-size: 1.1rem; color: var(--muted); margin-bottom: 1rem;">No props match your search or filter.</p>
+        <button type="button" class="btn btn-burgundy" id="home-catalog-reset-search" style="padding: 0.6rem 1.5rem; border-radius: 99px;">Clear Search &amp; Filters</button>
+      </div>
+    `;
+    const resetBtn = document.getElementById('home-catalog-reset-search');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        const searchInput = document.getElementById('nav-search-input');
+        if (searchInput) {
+          searchInput.value = '';
+          const clearBtn = document.getElementById('nav-search-clear');
+          if (clearBtn) clearBtn.style.display = 'none';
         }
-      }
-      renderProps();
-    });
+        window.activeHomeCategory = 'all';
+        window.activeHomeSearch = '';
+        const chips = document.querySelectorAll('[data-catalog-filter]');
+        chips.forEach(chip => {
+          chip.classList.toggle('active', chip.dataset.catalogFilter === 'all');
+        });
+        renderHomeProps();
+      });
+    }
+    return;
   }
 
-  if (searchClear) {
-    searchClear.addEventListener('click', () => {
-      if (searchInput) {
-        searchInput.value = '';
-        searchQuery = '';
-        searchClear.classList.add('hidden');
-        renderProps();
-      }
-    });
+  grid.innerHTML = items.map((item) => `
+    <article class="prop-card" style="background: white; border: 1px solid var(--border); border-radius: 1rem; overflow: hidden; display: flex; flex-direction: column; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div class="card-image" style="position: relative; height: 240px; overflow: hidden;">
+        <img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;" onclick="window.openGlobalLightbox('${item.image}', '${item.name}')" />
+        <span class="product-tag-badge" style="position: absolute; top: 1rem; left: 1rem; background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: var(--burgundy); padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">${item.tag}</span>
+      </div>
+      <div class="card-body" style="padding: 1.25rem; display: flex; flex-direction: column; flex-grow: 1; gap: 0.75rem;">
+        <h3 style="font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--text); margin: 0; line-height: 1.4;">${item.name}</h3>
+        <div style="font-size: 1.15rem; font-weight: 600; color: var(--burgundy); display: flex; align-items: baseline; gap: 0.25rem;">
+          ₹ ${item.price.toLocaleString('en-IN')} <span style="font-size: 0.8rem; color: var(--muted); font-weight: 400;">/ day</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem;">
+          <a href="booking.html?product=${encodeURIComponent(item.name)}" class="btn btn-gold" style="flex: 1; padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 99px; text-align: center; display: flex; align-items: center; justify-content: center;">Book Now</a>
+          <a href="product-details.html?id=${item.id}" class="btn btn-outline" style="flex: 1; padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 99px; text-align: center; border: 1px solid var(--border); color: var(--text); background: transparent; display: flex; align-items: center; justify-content: center;">Details</a>
+        </div>
+      </div>
+    </article>
+  `).join('');
+}
+
+window.renderHomeProps = function() {
+  const allProducts = loadProducts();
+  const searchInput = document.getElementById('nav-search-input');
+  if (searchInput) {
+    window.activeHomeSearch = searchInput.value.toLowerCase().trim();
+    const clearBtn = document.getElementById('nav-search-clear');
+    if (clearBtn) {
+      clearBtn.style.display = searchInput.value ? 'flex' : 'none';
+    }
   }
 
-  renderProps();
+  const filtered = allProducts.filter(item => {
+    const matchesCategory = window.activeHomeCategory === 'all' || item.eventCategory === window.activeHomeCategory;
+    const matchesSearch = !window.activeHomeSearch || item.name.toLowerCase().includes(window.activeHomeSearch) || (item.tag && item.tag.toLowerCase().includes(window.activeHomeSearch));
+    return matchesCategory && matchesSearch;
+  });
+
+  renderHomePropsList(filtered);
+};
+
+function initHomePage() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const searchQuery = urlParams.get('search');
+  const searchInput = document.getElementById('nav-search-input');
+  
+  if (searchQuery && searchInput) {
+    searchInput.value = searchQuery;
+  }
+
+  renderHomeProps();
+
+  const filterChips = document.querySelectorAll('[data-catalog-filter]');
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      window.activeHomeCategory = chip.dataset.catalogFilter || 'all';
+      filterChips.forEach(c => c.classList.toggle('active', c === chip));
+      renderHomeProps();
+    });
+  });
 }
 
 function initBookingPage() {
@@ -2070,14 +2142,6 @@ function initProductDetailsPage() {
 async function renderPage() {
   const page = getCurrentPage();
   if (page === 'home') {
-    renderShell(renderHomePage());
-  } else if (page === 'gallery') {
-    renderShell(renderGalleryPage());
-  } else if (page === 'services') {
-    renderShell(renderServicesPage());
-  } else if (page === 'about') {
-    renderShell(renderAboutPage());
-  } else if (page === 'props') {
     renderShell(`
       <section class="page-section">
         <div class="container" style="text-align: center; padding: 4rem 0;">
@@ -2090,7 +2154,16 @@ async function renderPage() {
       </style>
     `, true);
     await fetchProductsFromSupabase();
-    renderShell(renderPropsPage());
+    renderShell(renderHomePage());
+  } else if (page === 'gallery') {
+    renderShell(renderGalleryPage());
+  } else if (page === 'services') {
+    renderShell(renderServicesPage());
+  } else if (page === 'about') {
+    renderShell(renderAboutPage());
+  } else if (page === 'props') {
+    window.location.replace('index.html');
+    return;
   } else if (page === 'product-details') {
     renderShell(`
       <section class="page-section">

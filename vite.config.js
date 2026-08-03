@@ -12,7 +12,6 @@ export default defineConfig({
         contact: resolve(__dirname, 'contact.html'),
         gallery: resolve(__dirname, 'gallery.html'),
         login: resolve(__dirname, 'login.html'),
-        props: resolve(__dirname, 'props.html'),
         services: resolve(__dirname, 'services.html'),
         productDetails: resolve(__dirname, 'product-details.html'),
       },

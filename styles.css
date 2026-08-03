@@ -1280,3 +1280,59 @@ textarea {
   }
 }
 
+.nav-search-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 320px;
+  margin: 0 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.nav-search-input {
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 2.25rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.nav-search-input:focus {
+  border-color: var(--burgundy);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(107, 36, 56, 0.1);
+}
+
+.nav-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.1rem;
+  color: var(--muted);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .nav-search-wrapper {
+    margin: 0.5rem 0;
+    max-width: 100%;
+    order: 3;
+    width: 100%;
+  }
+  .nav-bar {
+    flex-wrap: wrap;
+  }
+}
+
