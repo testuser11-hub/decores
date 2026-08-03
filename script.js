@@ -165,7 +165,8 @@ async function saveProduct(productData, imagesList) {
       }
 
       let productId = productData.id;
-      if (productId) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+      if (productId && isUuid) {
         const { error } = await supabase
           .from('products')
           .update({
@@ -254,6 +255,11 @@ async function saveProduct(productData, imagesList) {
 
 async function deleteProduct(id) {
   if (isSupabaseConfigured) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isUuid) {
+      cachedProducts = null;
+      return true;
+    }
     try {
       const { error } = await supabase
         .from('products')
