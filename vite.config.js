@@ -14,6 +14,7 @@ export default defineConfig({
         login: resolve(__dirname, 'login.html'),
         props: resolve(__dirname, 'props.html'),
         services: resolve(__dirname, 'services.html'),
+        productDetails: resolve(__dirname, 'product-details.html'),
       },
     },
   },

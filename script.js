@@ -7,6 +7,274 @@ import {
 } from './src/services/crud.js';
 
 let currentUser = null;
+let cachedProducts = null;
+
+async function seedDefaultProductsToSupabase() {
+  const defaults = [
+    { name: 'Royal Gold Throne', image: './src/assets/prop-arch.jpg', price: 3500, tag: 'Seating', eventCategory: 'wedding' },
+    { name: 'Neon Love Sign', image: './src/assets/prop-neon.jpg', price: 1800, tag: 'Lighting', eventCategory: 'all' },
+    { name: 'Rose Floral Wall (8x8ft)', image: './src/assets/prop-floralwall.jpg', price: 6500, tag: 'Backdrop', eventCategory: 'wedding' },
+    { name: 'Marquee LOVE Letters', image: './src/assets/prop-marquee.jpg', price: 4200, tag: 'Lighting', eventCategory: 'all' },
+    { name: 'Gold Circle Floral Arch', image: './src/assets/prop-arch.jpg', price: 5500, tag: 'Backdrop', eventCategory: 'wedding' },
+    { name: '3-Tier Gold Cake Stand', image: './src/assets/prop-arch.jpg', price: 900, tag: 'Tableware', eventCategory: 'all' },
+    { name: 'Rustic Wooden Arch', image: './src/assets/prop-rustic-arch.png', price: 4800, tag: 'Backdrop', eventCategory: 'wedding' },
+    { name: 'Luxury Crystal Chandelier', image: './src/assets/prop-chandelier.png', price: 2500, tag: 'Lighting', eventCategory: 'all' },
+  ];
+
+  for (const item of defaults) {
+    const slug = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let categoryId = null;
+    if (item.eventCategory === 'wedding') {
+      categoryId = '33333333-3333-3333-3333-333333333333';
+    } else if (item.eventCategory === 'birthday') {
+      categoryId = '44444444-4444-4444-4444-444444444444';
+    } else if (item.eventCategory === 'corporate') {
+      categoryId = '55555555-5555-5555-5555-555555555555';
+    }
+
+    try {
+      const { data: prodData, error: prodError } = await supabase
+        .from('products')
+        .insert({
+          name: item.name,
+          slug: slug,
+          price: item.price,
+          tag: item.tag,
+          event_category: item.eventCategory,
+          category_id: categoryId,
+          is_active: true,
+          is_deleted: false
+        })
+        .select('id')
+        .single();
+
+      if (prodError) {
+        console.error("Seeding product error:", prodError);
+        continue;
+      }
+
+      if (prodData) {
+        const resolvedImg = resolveAsset(item.image);
+        await supabase
+          .from('product_images')
+          .insert({
+            product_id: prodData.id,
+            image_url: resolvedImg,
+            is_primary: true,
+            sort_order: 0
+          });
+      }
+    } catch (err) {
+      console.error("Seeding catch error:", err);
+    }
+  }
+}
+
+async function fetchProductsFromSupabase() {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_images (*)
+        `)
+        .eq('is_active', true)
+        .eq('is_deleted', false);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        console.log("Supabase database has no products, seeding defaults...");
+        await seedDefaultProductsToSupabase();
+        return fetchProductsFromSupabase();
+      }
+
+      cachedProducts = data.map(item => {
+        const sortedImages = (item.product_images || []).sort((a, b) => a.sort_order - b.sort_order);
+        const primaryImgObj = sortedImages.find(img => img.is_primary) || sortedImages[0];
+        const primaryImageUrl = primaryImgObj ? primaryImgObj.image_url : './src/assets/prop-arch.jpg';
+        
+        return {
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          price: Number(item.price),
+          tag: item.tag || 'Seating',
+          eventCategory: item.event_category || 'all',
+          image: primaryImageUrl,
+          images: sortedImages.map(img => img.image_url),
+          rawImages: sortedImages
+        };
+      });
+
+      return cachedProducts;
+    } catch (e) {
+      console.warn("Failed fetching products from Supabase, falling back to local storage:", e);
+    }
+  }
+
+  // Local storage fallback
+  const raw = window.localStorage.getItem('sky_decors_products_v2');
+  if (!raw) {
+    const defaults = [
+      { id: 'throne', name: 'Royal Gold Throne', image: './src/assets/prop-arch.jpg', price: 3500, tag: 'Seating', eventCategory: 'wedding' },
+      { id: 'neon', name: 'Neon Love Sign', image: './src/assets/prop-neon.jpg', price: 1800, tag: 'Lighting', eventCategory: 'all' },
+      { id: 'floral-wall', name: 'Rose Floral Wall (8x8ft)', image: './src/assets/prop-floralwall.jpg', price: 6500, tag: 'Backdrop', eventCategory: 'wedding' },
+      { id: 'marquee', name: 'Marquee LOVE Letters', image: './src/assets/prop-marquee.jpg', price: 4200, tag: 'Lighting', eventCategory: 'all' },
+      { id: 'arch', name: 'Gold Circle Floral Arch', image: './src/assets/prop-arch.jpg', price: 5500, tag: 'Backdrop', eventCategory: 'wedding' },
+      { id: 'cake-stand', name: '3-Tier Gold Cake Stand', image: './src/assets/prop-arch.jpg', price: 900, tag: 'Tableware', eventCategory: 'all' },
+      { id: 'rustic-arch', name: 'Rustic Wooden Arch', image: './src/assets/prop-rustic-arch.png', price: 4800, tag: 'Backdrop', eventCategory: 'wedding' },
+      { id: 'chandelier', name: 'Luxury Crystal Chandelier', image: './src/assets/prop-chandelier.png', price: 2500, tag: 'Lighting', eventCategory: 'all' },
+    ];
+    const resolvedDefaults = defaults.map(item => ({ ...item, image: resolveAsset(item.image), images: [resolveAsset(item.image)] }));
+    window.localStorage.setItem('sky_decors_products_v2', JSON.stringify(resolvedDefaults));
+    cachedProducts = resolvedDefaults;
+    return resolvedDefaults;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    cachedProducts = parsed.map((item) => {
+      const img = resolveAsset(item.image);
+      const images = item.images && item.images.length > 0 ? item.images.map(url => resolveAsset(url)) : [img];
+      return {
+        ...item,
+        image: img,
+        images: images,
+        eventCategory: item.eventCategory || 'all',
+      };
+    });
+    return cachedProducts;
+  } catch {
+    cachedProducts = [];
+    return [];
+  }
+}
+
+async function saveProduct(productData, imagesList) {
+  if (isSupabaseConfigured) {
+    try {
+      const slug = productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      let categoryId = null;
+      if (productData.eventCategory === 'wedding') {
+        categoryId = '33333333-3333-3333-3333-333333333333';
+      } else if (productData.eventCategory === 'birthday') {
+        categoryId = '44444444-4444-4444-4444-444444444444';
+      } else if (productData.eventCategory === 'corporate') {
+        categoryId = '55555555-5555-5555-5555-555555555555';
+      }
+
+      let productId = productData.id;
+      if (productId) {
+        const { error } = await supabase
+          .from('products')
+          .update({
+            name: productData.name,
+            slug: slug,
+            price: productData.price,
+            tag: productData.tag,
+            event_category: productData.eventCategory,
+            category_id: categoryId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', productId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('products')
+          .insert({
+            name: productData.name,
+            slug: slug,
+            price: productData.price,
+            tag: productData.tag,
+            event_category: productData.eventCategory,
+            category_id: categoryId,
+            is_active: true,
+            is_deleted: false
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        productId = data.id;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('product_id', productId);
+      if (deleteError) throw deleteError;
+
+      if (imagesList && imagesList.length > 0) {
+        const { error: insertError } = await supabase
+          .from('product_images')
+          .insert(imagesList.map((img, idx) => ({
+            product_id: productId,
+            image_url: img.image_url,
+            is_primary: img.is_primary,
+            sort_order: idx
+          })));
+        if (insertError) throw insertError;
+      }
+
+      cachedProducts = null;
+      await fetchProductsFromSupabase();
+      return true;
+    } catch (e) {
+      console.error("Failed to save product to Supabase:", e);
+      alert("Error saving product: " + e.message);
+      return false;
+    }
+  }
+
+  const list = loadProducts();
+  const index = list.findIndex(p => p.id === productData.id);
+  const primaryImgObj = imagesList.find(img => img.is_primary) || imagesList[0];
+  const primaryImgUrl = primaryImgObj ? primaryImgObj.image_url : './src/assets/prop-arch.jpg';
+  
+  const mappedProduct = {
+    id: productData.id || window.crypto.randomUUID(),
+    name: productData.name,
+    price: productData.price,
+    tag: productData.tag,
+    eventCategory: productData.eventCategory,
+    image: primaryImgUrl,
+    images: imagesList.map(img => img.image_url)
+  };
+
+  if (index > -1) {
+    list[index] = mappedProduct;
+  } else {
+    list.push(mappedProduct);
+  }
+  
+  saveProducts(list);
+  cachedProducts = list;
+  return true;
+}
+
+async function deleteProduct(id) {
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_deleted: true })
+        .eq('id', id);
+      if (error) throw error;
+      cachedProducts = null;
+      await fetchProductsFromSupabase();
+      return true;
+    } catch (e) {
+      console.error("Failed to delete product from Supabase:", e);
+      alert("Error deleting product: " + e.message);
+      return false;
+    }
+  }
+
+  const list = loadProducts().filter(p => p.id !== id);
+  saveProducts(list);
+  cachedProducts = list;
+  return true;
+}
 
 // Resolve all asset paths dynamically for Vite production bundling
 const images = import.meta.glob('./src/assets/**/*', { eager: true, import: 'default' });
@@ -62,7 +330,7 @@ function loadTestimonials() {
       { id: 't1', quote: 'Sky Decors turned our mandap into a fairytale. Every guest was speechless.', name: 'Aarti & Rohan' },
       { id: 't2', quote: 'The pastel setup was straight out of Pinterest. Worth every rupee.', name: 'Priya S.' },
       { id: 't3', quote: 'The rooftop candle dinner was pure magic. Highly recommend!', name: 'Meera & Vikas' },
-      { id: 't4', quote: 'Professional, on-time, and the floral install went viral on LinkedIn.', name: 'Nikhil (Corp.)' },
+      { id: 't4', quote: 'Professional, on-time, and the floral install went viral on LinkedIn.', name: 'N निखिल (Corp.)' },
     ];
     window.localStorage.setItem('sky_decors_testimonials_v2', JSON.stringify(defaults));
     return defaults;
@@ -79,32 +347,27 @@ function saveTestimonials(list) {
 }
 
 function loadProducts() {
+  if (cachedProducts) {
+    return cachedProducts;
+  }
   const raw = window.localStorage.getItem('sky_decors_products_v2');
-  if (!raw) {
-    const defaults = [
-      { id: 'throne', name: 'Royal Gold Throne', image: './src/assets/prop-arch.jpg', price: 3500, tag: 'Seating', eventCategory: 'wedding' },
-      { id: 'neon', name: 'Neon Love Sign', image: './src/assets/prop-neon.jpg', price: 1800, tag: 'Lighting', eventCategory: 'all' },
-      { id: 'floral-wall', name: 'Rose Floral Wall (8x8ft)', image: './src/assets/prop-floralwall.jpg', price: 6500, tag: 'Backdrop', eventCategory: 'wedding' },
-      { id: 'marquee', name: 'Marquee LOVE Letters', image: './src/assets/prop-marquee.jpg', price: 4200, tag: 'Lighting', eventCategory: 'all' },
-      { id: 'arch', name: 'Gold Circle Floral Arch', image: './src/assets/prop-arch.jpg', price: 5500, tag: 'Backdrop', eventCategory: 'wedding' },
-      { id: 'cake-stand', name: '3-Tier Gold Cake Stand', image: './src/assets/prop-arch.jpg', price: 900, tag: 'Tableware', eventCategory: 'all' },
-      { id: 'rustic-arch', name: 'Rustic Wooden Arch', image: './src/assets/prop-rustic-arch.png', price: 4800, tag: 'Backdrop', eventCategory: 'wedding' },
-      { id: 'chandelier', name: 'Luxury Crystal Chandelier', image: './src/assets/prop-chandelier.png', price: 2500, tag: 'Lighting', eventCategory: 'all' },
-    ];
-    const resolvedDefaults = defaults.map(item => ({ ...item, image: resolveAsset(item.image) }));
-    window.localStorage.setItem('sky_decors_products_v2', JSON.stringify(resolvedDefaults));
-    return resolvedDefaults;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.map((item) => {
+        const img = resolveAsset(item.image);
+        return {
+          ...item,
+          image: img,
+          images: item.images && item.images.length > 0 ? item.images.map(u => resolveAsset(u)) : [img],
+          eventCategory: item.eventCategory || 'all',
+        };
+      });
+    } catch {
+      return [];
+    }
   }
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed.map((item) => ({
-      ...item,
-      image: resolveAsset(item.image),
-      eventCategory: item.eventCategory || 'all',
-    }));
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 function saveProducts(list) {
@@ -153,7 +416,7 @@ function getPageTitle(page) {
   return titles[page] || titles.home;
 }
 
-function renderShell(content) {
+function renderShell(content, skipHandlers = false) {
   document.title = getPageTitle(getCurrentPage());
   document.body.innerHTML = `
     <header class="site-header">
@@ -192,7 +455,9 @@ function renderShell(content) {
   `;
 
   initMobileNav();
-  attachPageHandlers();
+  if (!skipHandlers) {
+    attachPageHandlers();
+  }
 
   const navLogoutBtn = document.getElementById('nav-logout-btn');
   if (navLogoutBtn) {
@@ -458,6 +723,12 @@ function renderPropsPage() {
           <p class="page-intro">Rent individual props by the day, or bundle them with a decoration package. Prices are per day, subject to availability.</p>
         </div>
 
+        <div class="search-bar-container">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="prop-search-input" class="search-input" placeholder="Search props by name..." />
+          <button type="button" id="prop-search-clear" class="search-clear-btn hidden" aria-label="Clear search">×</button>
+        </div>
+
         <div class="filter-row">
           ${EVENT_CATEGORIES.map((cat) => '<button class="filter-chip ' + (cat.slug === 'all' ? 'active' : '') + '" type="button" data-filter="' + cat.slug + '">' + cat.name + '</button>').join('')}
         </div>
@@ -563,31 +834,14 @@ function renderBookingPage() {
               <input class="form-input" id="eventDate" name="eventDate" type="date" />
               <p class="field-error" data-error-for="eventDate"></p>
             </div>
+            <div class="field-group full hidden" id="selected-product-group">
+              <label class="field-label" for="selectedProduct">Selected Product / Prop</label>
+              <input class="form-input" id="selectedProduct" name="selectedProduct" type="text" readonly style="background: #f4eee6; border-color: var(--border); color: var(--burgundy); font-weight: 600;" />
+            </div>
             <div class="field-group full">
               <label class="field-label" for="venue">Venue / city</label>
               <input class="form-input" id="venue" name="venue" type="text" />
               <p class="field-error" data-error-for="venue"></p>
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="budget">Budget range</label>
-              <select class="form-select" id="budget" name="budget">
-                <option value="">Select...</option>
-                <option>Under ₹25k</option>
-                <option>₹25k – ₹75k</option>
-                <option>₹75k – ₹2L</option>
-                <option>₹2L – ₹5L</option>
-                <option>₹5L+</option>
-              </select>
-              <p class="field-error" data-error-for="budget"></p>
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="package">Preferred package</label>
-              <select class="form-select" id="package" name="package">
-                <option value="">Not sure yet</option>
-                ${packages.map((item) => `<option>${item.tier}</option>`).join('')}
-                <option>Custom / Bespoke</option>
-              </select>
-              <p class="field-error" data-error-for="package"></p>
             </div>
             <div class="field-group full">
               <label class="field-label" for="notes">Additional notes / references</label>
@@ -701,18 +955,17 @@ function renderAdminPage(bookingsList = null) {
         </div>
         <div class="table-card">
           <table>
-            <thead><tr><th>Client</th><th>Event</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Client</th><th>Event / Details</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
               ${filterBookings(bookings, bookingFilter).map((item) => `
                 <tr>
                   <td>${item.name || '—'}<br /><small>${item.email || '—'}<br />${item.phone || '—'}</small></td>
                   <td>
                     ${item.eventType || '—'}<br />
-                    <small>📍 ${item.venue || '—'}</small><br />
-                    <small>📦 ${item.package || '—'}</small>
+                    <small>📍 ${item.venue || '—'}</small>
+                    ${item.product ? `<br /><small style="color: var(--burgundy); font-weight: 600;">Prop: ${item.product}</small>` : ''}
                     ${item.notes ? `<br /><small style="color: var(--muted); font-style: italic; display: block; margin-top: 0.25rem;">📝 "${item.notes}"</small>` : ''}
                   </td>
-                  <td>${item.budget || '—'}</td>
                   <td>${statusBadge(item.status)}</td>
                   <td>
                     <div class="admin-actions">
@@ -974,6 +1227,10 @@ function attachPageHandlers() {
   if (page === 'admin') {
     initAdminPage();
   }
+
+  if (page === 'product-details') {
+    initProductDetailsPage();
+  }
 }
 
 function initGalleryPage() {
@@ -1024,23 +1281,51 @@ function initGalleryPage() {
 function initPropsPage() {
   const grid = document.getElementById('prop-grid');
   const filters = Array.from(document.querySelectorAll('.filter-chip'));
+  const searchInput = document.getElementById('prop-search-input');
+  const searchClear = document.getElementById('prop-search-clear');
 
   let activeFilter = 'all';
+  let searchQuery = '';
 
   function renderProps() {
     const allProducts = loadProducts();
-    const items = activeFilter === 'all' 
-      ? allProducts 
-      : allProducts.filter((item) => item.eventCategory === activeFilter || item.eventCategory === 'all');
+    const items = allProducts.filter((item) => {
+      const matchesCategory = activeFilter === 'all' || item.eventCategory === activeFilter || item.eventCategory === 'all';
+      const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery);
+      return matchesCategory && matchesSearch;
+    });
       
+    if (items.length === 0) {
+      grid.innerHTML = `
+        <div class="no-results">
+          <p>No props found matching "${searchQuery}"</p>
+          <button type="button" class="btn btn-outline" style="border-color: var(--burgundy); color: var(--burgundy); background: transparent;" id="clear-search-btn">Clear Search</button>
+        </div>
+      `;
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          if (searchInput) {
+            searchInput.value = '';
+            searchQuery = '';
+            if (searchClear) searchClear.classList.add('hidden');
+            renderProps();
+          }
+        });
+      }
+      return;
+    }
+
     grid.innerHTML = items.map((item) => `
       <article class="prop-card">
-        <div class="card-image"><img src="${item.image}" alt="${item.name}" /></div>
+        <a href="product-details.html?id=${item.id}" class="card-image" style="display:block; height: 240px; overflow:hidden;">
+          <img src="${item.image}" alt="${item.name}" />
+        </a>
         <div class="card-body">
           <div class="eyebrow">${item.tag} ${item.eventCategory !== 'all' ? `• ${EVENT_CATEGORIES.find(c => c.slug === item.eventCategory)?.name || item.eventCategory}` : ''}</div>
-          <h3>${item.name}</h3>
+          <h3><a href="product-details.html?id=${item.id}">${item.name}</a></h3>
           <p>₹ ${item.price.toLocaleString('en-IN')} / day</p>
-          <a href="booking.html" class="btn btn-burgundy" style="margin-top: 1rem;">Enquire</a>
+          <a href="booking.html?product=${encodeURIComponent(item.name)}" class="btn btn-burgundy" style="margin-top: 1rem; width: 100%; text-align: center;">Book Now</a>
         </div>
       </article>
     `).join('');
@@ -1053,6 +1338,31 @@ function initPropsPage() {
       renderProps();
     });
   });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.toLowerCase().trim();
+      if (searchClear) {
+        if (searchQuery) {
+          searchClear.classList.remove('hidden');
+        } else {
+          searchClear.classList.add('hidden');
+        }
+      }
+      renderProps();
+    });
+  }
+
+  if (searchClear) {
+    searchClear.addEventListener('click', () => {
+      if (searchInput) {
+        searchInput.value = '';
+        searchQuery = '';
+        searchClear.classList.add('hidden');
+        renderProps();
+      }
+    });
+  }
 
   renderProps();
 }
@@ -1070,6 +1380,31 @@ function initBookingPage() {
   const success = document.getElementById('booking-success');
   if (!form) return;
 
+  // Prefill Selected Product from URL query
+  const urlParams = new URLSearchParams(window.location.search);
+  const productParam = urlParams.get('product');
+  if (productParam) {
+    const group = document.getElementById('selected-product-group');
+    const input = document.getElementById('selectedProduct');
+    if (group && input) {
+      group.classList.remove('hidden');
+      input.value = decodeURIComponent(productParam);
+    }
+  }
+
+  // Set min date constraint to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yyyy = tomorrow.getFullYear();
+  const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const dd = String(tomorrow.getDate()).padStart(2, '0');
+  const tomorrowStr = `${yyyy}-${mm}-${dd}`;
+
+  const dateInput = document.getElementById('eventDate');
+  if (dateInput) {
+    dateInput.min = tomorrowStr;
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
@@ -1080,9 +1415,13 @@ function initBookingPage() {
     if (!String(values.phone || '').trim()) errors.phone = 'Please enter a phone number';
     if (!String(values.email || '').trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) errors.email = 'Enter a valid email';
     if (!String(values.eventType || '').trim()) errors.eventType = 'Select an event type';
-    if (!String(values.eventDate || '').trim()) errors.eventDate = 'Pick a date';
+    
+    // Check that event date is selected and is tomorrow or later
+    if (!String(values.eventDate || '').trim() || values.eventDate < tomorrowStr) {
+      errors.eventDate = 'Please select a future date (from tomorrow onwards)';
+    }
+    
     if (!String(values.venue || '').trim()) errors.venue = 'Where is the event?';
-    if (!String(values.budget || '').trim()) errors.budget = 'Choose a budget';
 
     document.querySelectorAll('.field-error').forEach((item) => {
       item.textContent = '';
@@ -1103,8 +1442,7 @@ function initBookingPage() {
       eventType: String(values.eventType).trim(),
       eventDate: String(values.eventDate).trim(),
       venue: String(values.venue).trim(),
-      budget: String(values.budget).trim(),
-      package: String(values.package || '').trim(),
+      product: String(values.selectedProduct || '').trim(),
       notes: String(values.notes || '').trim(),
     });
 
@@ -1215,8 +1553,90 @@ function initAdminPage() {
   const propFormContainer = document.getElementById('prop-form-container');
   const propListTable = document.getElementById('prop-list-table');
 
+  let currentImages = [];
+
+  window.renderAdminImageList = function() {
+    const container = document.getElementById('admin-image-manager-list');
+    if (!container) return;
+
+    if (currentImages.length === 0) {
+      container.innerHTML = `<p style="grid-column: 1/-1; font-size: 0.85rem; color: var(--muted); text-align: center; padding: 1rem 0; font-weight: 500;">No images uploaded yet.</p>`;
+      return;
+    }
+
+    container.innerHTML = currentImages.map((img, index) => `
+      <div class="image-manage-card" style="position: relative; background: #fbf7f1; border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+        <div style="width: 100%; aspect-ratio: 1; border-radius: 0.5rem; overflow: hidden; background: #eae4dd;">
+          <img src="${img.image_url}" alt="Prop image" style="width: 100%; height: 100%; object-fit: cover;" />
+        </div>
+        
+        <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; color: var(--text); cursor: pointer; margin: 0.25rem 0;">
+          <input type="radio" name="primary-image-radio" ${img.is_primary ? 'checked' : ''} onchange="window.setPrimaryImage(${index})" />
+          Thumbnail
+        </label>
+        
+        <div style="display: flex; gap: 0.25rem; width: 100%; justify-content: center;">
+          <button type="button" class="btn btn-muted" style="padding: 0.2rem 0.4rem; font-size: 0.7rem; border-radius: 4px;" onclick="window.moveImageUp(${index})" ${index === 0 ? 'disabled style="opacity: 0.3; pointer-events: none;"' : ''}>▲</button>
+          <button type="button" class="btn btn-muted" style="padding: 0.2rem 0.4rem; font-size: 0.7rem; border-radius: 4px;" onclick="window.moveImageDown(${index})" ${index === currentImages.length - 1 ? 'disabled style="opacity: 0.3; pointer-events: none;"' : ''}>▼</button>
+          <button type="button" class="btn btn-burgundy" style="padding: 0.2rem 0.4rem; font-size: 0.7rem; border-radius: 4px; color: white;" onclick="window.deleteImage(${index})">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  };
+
+  window.setPrimaryImage = function(index) {
+    currentImages.forEach((img, i) => {
+      img.is_primary = i === index;
+    });
+    window.renderAdminImageList();
+  };
+
+  window.moveImageUp = function(index) {
+    if (index > 0) {
+      const temp = currentImages[index];
+      currentImages[index] = currentImages[index - 1];
+      currentImages[index - 1] = temp;
+      window.renderAdminImageList();
+    }
+  };
+
+  window.moveImageDown = function(index) {
+    if (index < currentImages.length - 1) {
+      const temp = currentImages[index];
+      currentImages[index] = currentImages[index + 1];
+      currentImages[index + 1] = temp;
+      window.renderAdminImageList();
+    }
+  };
+
+  window.deleteImage = function(index) {
+    const wasPrimary = currentImages[index].is_primary;
+    currentImages.splice(index, 1);
+    if (wasPrimary && currentImages.length > 0) {
+      currentImages[0].is_primary = true;
+    }
+    window.renderAdminImageList();
+  };
+
   function renderPropForm(editingProp = null) {
     if (!propFormContainer) return;
+
+    if (editingProp) {
+      if (editingProp.rawImages) {
+        currentImages = editingProp.rawImages.map(img => ({
+          image_url: img.image_url,
+          is_primary: img.is_primary
+        }));
+      } else {
+        currentImages = [{
+          image_url: editingProp.image,
+          is_primary: true
+        }];
+      }
+    } else {
+      currentImages = [];
+    }
+
     propFormContainer.innerHTML = `
       <form id="admin-prop-form" class="form-shell" style="max-width: 600px; margin-bottom: 2rem; background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
         <input type="hidden" name="id" id="prop-id" value="${editingProp ? editingProp.id : ''}" />
@@ -1247,10 +1667,21 @@ function initAdminPage() {
             <label class="field-label" style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;" for="prop-price">Price (₹ / day)</label>
             <input class="form-input" style="padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem;" id="prop-price" name="price" type="number" value="${editingProp ? editingProp.price : ''}" required />
           </div>
-          <div class="field-group" style="display: flex; flex-direction: column;">
-            <label class="field-label" style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;" for="prop-image">Image URL</label>
-            <input class="form-input" style="padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem;" id="prop-image" name="image" type="text" value="${editingProp ? editingProp.image : resolveAsset('./src/assets/prop-arch.jpg')}" required />
+          
+          <div class="field-group full" style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <label class="field-label" style="font-weight: 600; font-size: 0.85rem;">Product Images</label>
+            <input type="file" id="prop-images-upload-input" accept="image/*" multiple style="display: none;" />
+            <div class="upload-zone" id="upload-zone">
+              <span style="font-size: 1.5rem;">📁</span>
+              <p style="margin: 0.5rem 0 0; font-size: 0.9rem; color: var(--muted); font-weight: 500;">Click to select images to upload</p>
+              <span style="font-size: 0.75rem; color: var(--muted);">Supports PNG, JPG, JPEG (multiple allowed)</span>
+            </div>
+            
+            <div id="admin-image-manager-list" class="admin-image-manager-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1rem; margin-top: 1rem;">
+              <!-- Dynamic thumbnail list -->
+            </div>
           </div>
+          
           <div class="field-group full" style="display: flex; gap: 1rem; margin-top: 1rem;">
             <button type="submit" class="btn btn-gold" style="padding: 0.6rem 1.5rem; border-radius: 999px;">${editingProp ? 'Save Changes' : 'Add Prop'}</button>
             <button type="button" class="btn btn-outline" id="admin-prop-cancel" style="padding: 0.6rem 1.5rem; border-radius: 999px; background: transparent; border: 1px solid var(--muted); color: var(--muted);">Cancel</button>
@@ -1261,13 +1692,93 @@ function initAdminPage() {
     propFormContainer.classList.remove('hidden');
     if (propListTable) propListTable.classList.add('hidden');
 
+    window.renderAdminImageList();
+
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('prop-images-upload-input');
+    
+    if (uploadZone && fileInput) {
+      uploadZone.addEventListener('click', () => fileInput.click());
+      
+      fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        
+        const managerList = document.getElementById('admin-image-manager-list');
+        
+        for (const file of files) {
+          const skeleton = document.createElement('div');
+          skeleton.className = 'upload-skeleton-card';
+          skeleton.innerHTML = `
+            <div class="upload-spinner"></div>
+            <span style="font-size: 0.75rem; color: var(--muted);">Uploading...</span>
+          `;
+          if (managerList) {
+            if (currentImages.length === 0 && managerList.firstElementChild && managerList.firstElementChild.tagName === 'P') {
+              managerList.innerHTML = '';
+            }
+            managerList.appendChild(skeleton);
+          }
+          
+          try {
+            if (isSupabaseConfigured) {
+              const fileExt = file.name.split('.').pop();
+              const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+              const filePath = `${fileName}`;
+              
+              const { data, error } = await supabase.storage
+                .from('product-images')
+                .upload(filePath, file);
+                
+              if (error) throw error;
+              
+              const { data: { publicUrl } } = supabase.storage
+                .from('product-images')
+                .getPublicUrl(filePath);
+                
+              currentImages.push({
+                image_url: publicUrl,
+                is_primary: currentImages.length === 0
+              });
+            } else {
+              const reader = new FileReader();
+              await new Promise((resolve, reject) => {
+                reader.onload = (event) => {
+                  currentImages.push({
+                    image_url: event.target.result,
+                    is_primary: currentImages.length === 0
+                  });
+                  resolve();
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+            }
+          } catch (uploadErr) {
+            console.error("Upload error:", uploadErr);
+            alert("Upload failed for " + file.name + ": " + uploadErr.message);
+          }
+          
+          skeleton.remove();
+          window.renderAdminImageList();
+        }
+        fileInput.value = '';
+      });
+    }
+
     document.getElementById('admin-prop-cancel').addEventListener('click', () => {
       propFormContainer.classList.add('hidden');
       if (propListTable) propListTable.classList.remove('hidden');
     });
 
-    document.getElementById('admin-prop-form').addEventListener('submit', (e) => {
+    document.getElementById('admin-prop-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
+      if (currentImages.length === 0) {
+        alert("Please upload at least one image for the product.");
+        return;
+      }
+      
       const form = e.target;
       const data = new FormData(form);
       const id = data.get('id');
@@ -1275,21 +1786,11 @@ function initAdminPage() {
       const tag = data.get('tag');
       const eventCategory = data.get('eventCategory');
       const price = parseFloat(data.get('price'));
-      const image = data.get('image');
-
-      const products = loadProducts();
-      if (id) {
-        const index = products.findIndex((p) => p.id === id);
-        if (index > -1) {
-          products[index] = { id, name, tag, eventCategory, price, image };
-        }
-      } else {
-        const newId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || window.crypto.randomUUID();
-        products.push({ id: newId, name, tag, eventCategory, price, image });
+      
+      const successSave = await saveProduct({ id, name, tag, eventCategory, price }, currentImages);
+      if (successSave) {
+        renderPage();
       }
-
-      saveProducts(products);
-      renderPage();
     });
   }
 
@@ -1306,12 +1807,13 @@ function initAdminPage() {
   });
 
   document.querySelectorAll('[data-prop-delete-id]').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const id = button.dataset.propDeleteId;
       if (window.confirm('Are you sure you want to delete this prop?')) {
-        const products = loadProducts().filter((p) => p.id !== id);
-        saveProducts(products);
-        renderPage();
+        const successDel = await deleteProduct(id);
+        if (successDel) {
+          renderPage();
+        }
       }
     });
   });
@@ -1398,6 +1900,159 @@ function initAdminPage() {
   });
 }
 
+function renderProductDetailsPage() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const productId = urlParams.get('id');
+  const allProducts = loadProducts();
+  const product = allProducts.find(p => p.id === productId);
+
+  if (!product) {
+    return `
+      <section class="page-section" style="min-height: 60vh; display: grid; place-items: center;">
+        <div style="text-align: center;">
+          <h2 style="font-family: 'Playfair Display', serif; color: var(--burgundy); font-size: 2.2rem; margin-bottom: 1rem;">Prop Not Found</h2>
+          <p style="color: var(--muted); margin-bottom: 2rem;">The prop you are looking for does not exist or has been removed.</p>
+          <a href="props.html" class="btn btn-burgundy">Return to Catalog</a>
+        </div>
+      </section>
+    `;
+  }
+
+  const imagesList = product.images && product.images.length > 0 ? product.images : [product.image];
+
+  return `
+    <section class="page-section">
+      <div class="container">
+        <!-- Back Breadcrumb -->
+        <a href="props.html" class="details-back-link">
+          <span>←</span> Back to Props Catalog
+        </a>
+
+        <div class="product-details-grid">
+          <!-- Left: Image Slider -->
+          <div class="slider-container">
+            <div class="slider-main">
+              <div class="slider-viewport" id="slider-viewport">
+                ${imagesList.map((url, idx) => `
+                  <div class="slider-slide ${idx === 0 ? 'active' : ''}" data-index="${idx}">
+                    <img src="${url}" alt="${product.name} - View ${idx + 1}" />
+                  </div>
+                `).join('')}
+              </div>
+              
+              ${imagesList.length > 1 ? `
+                <button type="button" class="slider-nav-btn slider-nav-prev" id="slider-prev" aria-label="Previous image">‹</button>
+                <button type="button" class="slider-nav-btn slider-nav-next" id="slider-next" aria-label="Next image">›</button>
+              ` : ''}
+            </div>
+
+            ${imagesList.length > 1 ? `
+              <div class="slider-thumbnails">
+                ${imagesList.map((url, idx) => `
+                  <button type="button" class="slider-thumbnail ${idx === 0 ? 'active' : ''}" data-index="${idx}" aria-label="Go to slide ${idx + 1}">
+                    <img src="${url}" alt="Thumbnail ${idx + 1}" />
+                  </button>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Right: Details Info -->
+          <div class="product-info-panel">
+            <div>
+              <span class="product-tag-badge">${product.tag}</span>
+            </div>
+            <h1>${product.name}</h1>
+            <div class="product-price-tag">
+              ₹ ${product.price.toLocaleString('en-IN')} <span>/ day</span>
+            </div>
+            
+            <div class="product-details-card">
+              <h4>Rental Details & Terms</h4>
+              <ul>
+                <li>Pricing is for a 24-hour hire duration.</li>
+                <li>Setup, delivery and teardown will be calculated at checkout.</li>
+                <li>Refundable damage deposit applicable upon confirmation.</li>
+                <li>Discounts available when booked as part of decor packages.</li>
+              </ul>
+            </div>
+            
+            <div style="margin-top: 1rem;">
+              <a href="booking.html?product=${encodeURIComponent(product.name)}" class="btn btn-gold" style="width: 100%; padding: 1rem; border-radius: 999px; text-align: center; display: block; font-size: 1.05rem; box-shadow: 0 12px 26px rgba(212, 162, 79, 0.3);">
+                Book Now
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function initProductDetailsPage() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const productId = urlParams.get('id');
+  const allProducts = loadProducts();
+  const product = allProducts.find(p => p.id === productId);
+  if (!product) return;
+
+  const imagesList = product.images && product.images.length > 0 ? product.images : [product.image];
+  if (imagesList.length <= 1) return;
+
+  let currentIndex = 0;
+  const slides = Array.from(document.querySelectorAll('.slider-slide'));
+  const thumbnails = Array.from(document.querySelectorAll('.slider-thumbnail'));
+  const prevBtn = document.getElementById('slider-prev');
+  const nextBtn = document.getElementById('slider-next');
+
+  function goToSlide(index) {
+    slides[currentIndex].classList.remove('active');
+    thumbnails[currentIndex].classList.remove('active');
+
+    currentIndex = (index + slides.length) % slides.length;
+
+    slides[currentIndex].classList.add('active');
+    thumbnails[currentIndex].classList.add('active');
+    
+    const activeThumb = thumbnails[currentIndex];
+    const parent = activeThumb.parentElement;
+    if (parent) {
+      const parentLeft = parent.scrollLeft;
+      const parentWidth = parent.clientWidth;
+      const thumbLeft = activeThumb.offsetLeft;
+      const thumbWidth = activeThumb.clientWidth;
+      
+      if (thumbLeft < parentLeft) {
+        parent.scrollTo({ left: thumbLeft, behavior: 'smooth' });
+      } else if (thumbLeft + thumbWidth > parentLeft + parentWidth) {
+        parent.scrollTo({ left: thumbLeft + thumbWidth - parentWidth, behavior: 'smooth' });
+      }
+    }
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => goToSlide(currentIndex - 1));
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => goToSlide(currentIndex + 1));
+  }
+
+  thumbnails.forEach((thumb, idx) => {
+    thumb.addEventListener('click', () => goToSlide(idx));
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const slider = document.getElementById('slider-viewport');
+    if (!slider) return;
+    
+    if (e.key === 'ArrowLeft') {
+      goToSlide(currentIndex - 1);
+    } else if (e.key === 'ArrowRight') {
+      goToSlide(currentIndex + 1);
+    }
+  });
+}
+
 async function renderPage() {
   const page = getCurrentPage();
   if (page === 'home') {
@@ -1409,7 +2064,33 @@ async function renderPage() {
   } else if (page === 'about') {
     renderShell(renderAboutPage());
   } else if (page === 'props') {
+    renderShell(`
+      <section class="page-section">
+        <div class="container" style="text-align: center; padding: 4rem 0;">
+          <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--burgundy); animation: spin 1s linear infinite; margin: 0 auto 1rem auto;"></div>
+          <p style="font-size: 1.1rem; color: var(--muted); font-family: 'Inter', sans-serif;">Loading catalog...</p>
+        </div>
+      </section>
+      <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
+    `, true);
+    await fetchProductsFromSupabase();
     renderShell(renderPropsPage());
+  } else if (page === 'product-details') {
+    renderShell(`
+      <section class="page-section">
+        <div class="container" style="text-align: center; padding: 4rem 0;">
+          <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--burgundy); animation: spin 1s linear infinite; margin: 0 auto 1rem auto;"></div>
+          <p style="font-size: 1.1rem; color: var(--muted); font-family: 'Inter', sans-serif;">Loading details...</p>
+        </div>
+      </section>
+      <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
+    `, true);
+    await fetchProductsFromSupabase();
+    renderShell(renderProductDetailsPage());
   } else if (page === 'contact') {
     renderShell(renderContactPage());
   } else if (page === 'booking') {
@@ -1417,7 +2098,6 @@ async function renderPage() {
   } else if (page === 'login') {
     renderShell(renderLoginPage());
   } else if (page === 'admin') {
-    // Admin Route Protection: Redirect any non-admin users to the home page
     if (currentUser && currentUser.email !== 'mugeshkumartest@gmail.com') {
       window.location.replace('index.html');
       return;
@@ -1430,14 +2110,15 @@ async function renderPage() {
         <section class="page-section">
           <div class="container" style="text-align: center; padding: 4rem 0;">
             <div class="spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--burgundy); animation: spin 1s linear infinite; margin: 0 auto 1rem auto;"></div>
-            <p style="font-size: 1.1rem; color: var(--muted); font-family: 'Inter', sans-serif;">Loading enquiries...</p>
+            <p style="font-size: 1.1rem; color: var(--muted); font-family: 'Inter', sans-serif;">Loading enquiries and products...</p>
           </div>
         </section>
         <style>
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
-      `);
+      `, true);
       const bookings = await fetchBookings();
+      await fetchProductsFromSupabase();
       renderShell(renderAdminPage(bookings));
     }
   } else {
@@ -1454,13 +2135,11 @@ async function checkSupabaseSession() {
         if (session.user.email === 'mugeshkumartest@gmail.com') {
           window.sessionStorage.setItem('sky_admin_auth_v1', '1');
           
-          // Automatic login redirection to Admin Dashboard if they are currently on login or booking pages
           const currentPage = getCurrentPage();
           if (currentPage === 'login' || currentPage === 'booking') {
             window.location.replace('admin.html');
           }
         } else {
-          // Explicitly clear admin session for other users
           window.sessionStorage.removeItem('sky_admin_auth_v1');
         }
       } else {
