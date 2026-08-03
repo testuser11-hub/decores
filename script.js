@@ -11,6 +11,14 @@ let cachedProducts = null;
 
 async function seedDefaultProductsToSupabase() {
   const defaults = [
+    { name: 'Grand Mandap Setup', image: './src/assets/hero-wedding.jpg', price: 120000, tag: 'Wedding Setup', eventCategory: 'wedding' },
+    { name: 'Birthday Luxe Corner', image: './src/assets/cat-birthday.jpg', price: 45000, tag: 'Birthday Backdrop', eventCategory: 'birthday' },
+    { name: 'Haldi & Mehndi Styling', image: './src/assets/cat-haldi.jpg', price: 25000, tag: 'Haldi Setup', eventCategory: 'haldi' },
+    { name: 'Pink Balloon Garden', image: './src/assets/cat-babyshower.jpg', price: 18000, tag: 'Baby Shower Setup', eventCategory: 'baby-shower' },
+    { name: 'Rose Arch Installation', image: './src/assets/cat-engagement.jpg', price: 35000, tag: 'Engagement Setup', eventCategory: 'engagement' },
+    { name: 'Corporate Stage Setup', image: './src/assets/cat-corporate.jpg', price: 85000, tag: 'Corporate Stage', eventCategory: 'corporate' },
+    { name: 'Candlelit Anniversary Table', image: './src/assets/cat-anniversary.jpg', price: 12000, tag: 'Anniversary Table', eventCategory: 'anniversary' },
+    { name: 'Circular Floral Arch', image: './src/assets/prop-arch.jpg', price: 15000, tag: 'Floral Backdrop', eventCategory: 'wedding' },
     { name: 'Royal Gold Throne', image: './src/assets/prop-arch.jpg', price: 3500, tag: 'Seating', eventCategory: 'wedding' },
     { name: 'Neon Love Sign', image: './src/assets/prop-neon.jpg', price: 1800, tag: 'Lighting', eventCategory: 'all' },
     { name: 'Rose Floral Wall (8x8ft)', image: './src/assets/prop-floralwall.jpg', price: 6500, tag: 'Backdrop', eventCategory: 'wedding' },
@@ -93,7 +101,7 @@ async function fetchProductsFromSupabase() {
       cachedProducts = data.map(item => {
         const sortedImages = (item.product_images || []).sort((a, b) => a.sort_order - b.sort_order);
         const primaryImgObj = sortedImages.find(img => img.is_primary) || sortedImages[0];
-        const primaryImageUrl = primaryImgObj ? primaryImgObj.image_url : './src/assets/prop-arch.jpg';
+        const primaryImageUrl = primaryImgObj ? resolveAsset(primaryImgObj.image_url) : './src/assets/prop-arch.jpg';
         
         return {
           id: item.id,
@@ -103,7 +111,7 @@ async function fetchProductsFromSupabase() {
           tag: item.tag || 'Seating',
           eventCategory: item.event_category || 'all',
           image: primaryImageUrl,
-          images: sortedImages.map(img => img.image_url),
+          images: sortedImages.map(img => resolveAsset(img.image_url)),
           rawImages: sortedImages
         };
       });
@@ -115,9 +123,17 @@ async function fetchProductsFromSupabase() {
   }
 
   // Local storage fallback
-  const raw = window.localStorage.getItem('sky_decors_products_v2');
+  const raw = window.localStorage.getItem('sky_decors_products_v3');
   if (!raw) {
     const defaults = [
+      { id: 'mandap', name: 'Grand Mandap Setup', image: './src/assets/hero-wedding.jpg', price: 120000, tag: 'Wedding Setup', eventCategory: 'wedding' },
+      { id: 'birthday-corner', name: 'Birthday Luxe Corner', image: './src/assets/cat-birthday.jpg', price: 45000, tag: 'Birthday Backdrop', eventCategory: 'birthday' },
+      { id: 'haldi-swing', name: 'Haldi & Mehndi Styling', image: './src/assets/cat-haldi.jpg', price: 25000, tag: 'Haldi Setup', eventCategory: 'haldi' },
+      { id: 'balloon-garden', name: 'Pink Balloon Garden', image: './src/assets/cat-babyshower.jpg', price: 18000, tag: 'Baby Shower Setup', eventCategory: 'baby-shower' },
+      { id: 'rose-arch', name: 'Rose Arch Installation', image: './src/assets/cat-engagement.jpg', price: 35000, tag: 'Engagement Setup', eventCategory: 'engagement' },
+      { id: 'corp-stage', name: 'Corporate Stage Setup', image: './src/assets/cat-corporate.jpg', price: 85000, tag: 'Corporate Stage', eventCategory: 'corporate' },
+      { id: 'anniversary-table', name: 'Candlelit Anniversary Table', image: './src/assets/cat-anniversary.jpg', price: 12000, tag: 'Anniversary Table', eventCategory: 'anniversary' },
+      { id: 'floral-circle', name: 'Circular Floral Arch', image: './src/assets/prop-arch.jpg', price: 15000, tag: 'Floral Backdrop', eventCategory: 'wedding' },
       { id: 'throne', name: 'Royal Gold Throne', image: './src/assets/prop-arch.jpg', price: 3500, tag: 'Seating', eventCategory: 'wedding' },
       { id: 'neon', name: 'Neon Love Sign', image: './src/assets/prop-neon.jpg', price: 1800, tag: 'Lighting', eventCategory: 'all' },
       { id: 'floral-wall', name: 'Rose Floral Wall (8x8ft)', image: './src/assets/prop-floralwall.jpg', price: 6500, tag: 'Backdrop', eventCategory: 'wedding' },
@@ -128,7 +144,7 @@ async function fetchProductsFromSupabase() {
       { id: 'chandelier', name: 'Luxury Crystal Chandelier', image: './src/assets/prop-chandelier.png', price: 2500, tag: 'Lighting', eventCategory: 'all' },
     ];
     const resolvedDefaults = defaults.map(item => ({ ...item, image: resolveAsset(item.image), images: [resolveAsset(item.image)] }));
-    window.localStorage.setItem('sky_decors_products_v2', JSON.stringify(resolvedDefaults));
+    window.localStorage.setItem('sky_decors_products_v3', JSON.stringify(resolvedDefaults));
     cachedProducts = resolvedDefaults;
     return resolvedDefaults;
   }
@@ -356,7 +372,7 @@ function loadProducts() {
   if (cachedProducts) {
     return cachedProducts;
   }
-  const raw = window.localStorage.getItem('sky_decors_products_v2');
+  const raw = window.localStorage.getItem('sky_decors_products_v3');
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
@@ -377,7 +393,7 @@ function loadProducts() {
 }
 
 function saveProducts(list) {
-  window.localStorage.setItem('sky_decors_products_v2', JSON.stringify(list));
+  window.localStorage.setItem('sky_decors_products_v3', JSON.stringify(list));
 }
 
 const faqs = [
@@ -389,9 +405,7 @@ const faqs = [
 const navItems = [
   { href: 'index.html', label: 'Home' },
   { href: 'services.html', label: 'Services' },
-  { href: 'about.html', label: 'About' },
   { href: 'contact.html', label: 'Contact' },
-  { href: 'booking.html', label: 'Book Now' },
 ];
 
 const contactLinks = [
@@ -440,12 +454,6 @@ function renderShell(content, skipHandlers = false) {
           <span>Sky Decors &amp; Props</span>
         </a>
         
-        <div class="nav-search-wrapper">
-          <span style="position: absolute; left: 0.75rem; color: var(--muted); font-size: 0.9rem; pointer-events: none;">🔍</span>
-          <input type="text" id="nav-search-input" class="nav-search-input" placeholder="Search props..." />
-          <button type="button" id="nav-search-clear" class="nav-search-clear">×</button>
-        </div>
-
         <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
@@ -468,9 +476,54 @@ function renderShell(content, skipHandlers = false) {
     </header>
     <main class="page-main">${content}</main>
     <footer class="site-footer">
-      <div class="container footer-row">
-        <p>© 2026 Sky Decors & Props. Crafted with elegance.</p>
-        <a href="index.html">Back to top</a>
+      <div class="container footer-grid">
+        <div class="footer-col footer-about">
+          <a href="index.html" class="brand" style="margin-bottom: 1rem; display: inline-flex;">
+            <span class="brand-mark">✦</span>
+            <span>Sky Decors &amp; Props</span>
+          </a>
+          <p>Bespoke event decoration & premium props rental since 2018. We turn your special moments into unforgettable magic, designed to be photographed and remembered forever.</p>
+        </div>
+        
+        <div class="footer-col">
+          <h4>Quick Links</h4>
+          <ul class="footer-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="services.html">Services</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="contact.html">Contact</a></li>
+            ${currentUser && currentUser.email === 'mugeshkumartest@gmail.com'
+              ? `<li><a href="admin.html">Admin Dashboard</a></li>`
+              : ''
+            }
+          </ul>
+        </div>
+        
+        <div class="footer-col">
+          <h4>Contact Info</h4>
+          <ul class="footer-links">
+            <li><span style="color: var(--gold);">📞</span> +91 90000 00000</li>
+            <li><span style="color: var(--gold);">✉</span> hello@skydecors.in</li>
+            <li><span style="color: var(--gold);">📍</span> Hyderabad, Telangana</li>
+          </ul>
+        </div>
+        
+        <div class="footer-col">
+          <h4>Follow Us</h4>
+          <div class="footer-socials">
+            <a href="https://www.instagram.com/sky_decors_props" target="_blank" rel="noreferrer" aria-label="Instagram">📸 Instagram</a>
+            <a href="https://wa.me/919000000000" target="_blank" rel="noreferrer" aria-label="WhatsApp">💬 WhatsApp</a>
+            <a href="#" aria-label="Pinterest">📌 Pinterest</a>
+            <a href="#" aria-label="Facebook">📘 Facebook</a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <div class="container footer-bottom-row">
+          <p>© 2026 Sky Decors & Props. Crafted with elegance.</p>
+          <a href="#" class="back-to-top">Back to top ↑</a>
+        </div>
       </div>
     </footer>
     <div class="lightbox hidden" id="global-lightbox" role="dialog" aria-modal="true">
@@ -482,7 +535,6 @@ function renderShell(content, skipHandlers = false) {
   `;
 
   initMobileNav();
-  initGlobalSearch();
   if (!skipHandlers) {
     attachPageHandlers();
   }
@@ -526,8 +578,30 @@ function renderHomePage() {
           <p>Bespoke event decoration & premium props rental — from intimate anniversaries to grand weddings. Designed to be photographed. Remembered forever.</p>
           <div class="hero-actions">
             <a href="booking.html" class="btn btn-gold">Book Your Event</a>
-            <a href="gallery.html" class="btn btn-outline">View Gallery</a>
+            <a href="#home-catalog-section" class="btn btn-outline">View Gallery</a>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" id="home-catalog-section" style="background: var(--ivory); border-bottom: 1px solid var(--border); padding: 4rem 0;">
+      <div class="container">
+        <div class="section-heading centered" style="margin-bottom: 3rem; text-align: center; margin-left: auto; margin-right: auto;">
+          <p class="eyebrow">Every Celebration, Elevated</p>
+          <h2 style="font-size: clamp(2rem, 4vw, 3rem); font-family: 'Playfair Display', serif; color: var(--burgundy); margin-bottom: 0.75rem;">Bespoke Props for Hire</h2>
+          <p style="font-size: 1.1rem; color: var(--muted); max-width: 700px; margin: 0 auto;">Premium props straight from our studio to elevate your wedding, birthday, baby shower, or corporate event.</p>
+        </div>
+
+        <!-- Prominent Search Bar -->
+        <div class="search-bar-container" style="width: 100%; max-width: 650px; margin: 0 auto 3rem auto; position: relative;">
+          <span class="search-icon" style="position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); font-size: 1.25rem; color: var(--muted); pointer-events: none;">🔍</span>
+          <input type="text" id="home-search-input" class="search-input" placeholder="Search by event or prop name (e.g. Wedding, Birthday...)" style="width: 100%; padding: 1.1rem 3.5rem 1.1rem 3.5rem; border-radius: 999px; font-size: 1.1rem; border: 1px solid var(--border); box-shadow: 0 8px 30px rgba(35, 22, 26, 0.06); background: white; outline: none; transition: all 0.3s ease; box-sizing: border-box;" />
+          <button type="button" id="home-search-clear" class="search-clear-btn" style="position: absolute; right: 1.25rem; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.6rem; color: var(--muted); display: none; align-items: center; justify-content: center;">×</button>
+        </div>
+
+        <!-- Dynamic Product Cards Grid -->
+        <div class="card-grid" id="home-prop-grid">
+          <!-- Dynamic products list will be injected here -->
         </div>
       </div>
     </section>
@@ -540,27 +614,6 @@ function renderHomePage() {
         <div><strong>100+</strong><span>Unique props</span></div>
       </div>
     </section>
-
-    <section class="page-section">
-      <div class="container">
-        <div class="section-heading">
-          <p class="eyebrow">What we decorate</p>
-          <h2>Every celebration, elevated.</h2>
-          <p>From marigold-drenched haldis to marble-white weddings, every setup is tailored to the mood and the frame.</p>
-        </div>
-        <div class="card-grid">
-          ${categories.map((item) => `
-            <article class="card">
-              <div class="card-image"><img src="${item.image}" alt="${item.name}" style="cursor: zoom-in;" onclick="window.openGlobalLightbox('${item.image}', '${item.name}')" /></div>
-              <div class="card-body">
-                <h3>${item.name}</h3>
-                <p>${item.blurb}</p>
-              </div>
-            </article>
-          `).join('')}
-        </div>
-      </div>
-    </section>
  
     <section class="page-section section-alt">
       <div class="container process-grid">
@@ -570,28 +623,11 @@ function renderHomePage() {
           <p>Every event begins with a conversation and ends with tears of joy — the good kind.</p>
         </div>
         <ol class="process-list">
-          <li><strong>01. Consult</strong><span>Share your date, venue, vibe, and Pinterest boards.</span></li>
-          <li><strong>02. Design</strong><span>We craft a bespoke mood board and styling reference.</span></li>
-          <li><strong>03. Deliver</strong><span>Our team installs, styles, and dismantles — you just enjoy.</span></li>
+          <li><strong>01. Consult</strong><span>Share your vibe and Pinterest boards.</span></li>
+          <li><strong>02. Design</strong><span>We craft a bespoke mood board reference.</span></li>
+          <li><strong>03. Deliver</strong><span>Our team installs, styles, and dismantles.</span></li>
           <li><strong>04. Delight</strong><span>Every guest becomes your photographer.</span></li>
         </ol>
-      </div>
-    </section>
- 
-    <section class="page-section">
-      <div class="container">
-        <div class="section-heading">
-          <p class="eyebrow">Recently decorated</p>
-          <h2>Straight from our studio.</h2>
-        </div>
-        <div class="gallery-grid">
-          ${galleryItems.slice(0, 8).map((item) => `
-            <button class="gallery-card" type="button" onclick="window.openGlobalLightbox('${item.image}', '${item.title}')">
-              <div class="thumb"><img src="${item.image}" alt="${item.title}" /></div>
-              <div class="gallery-title">${item.title}</div>
-            </button>
-          `).join('')}
-        </div>
       </div>
     </section>
 
@@ -612,7 +648,7 @@ function renderHomePage() {
         </div>
       </div>
     </section>
-
+ 
     <section class="page-section">
       <div class="container">
         <div class="section-heading">
@@ -626,24 +662,6 @@ function renderHomePage() {
               <p>${item.answer}</p>
             </div>
           `).join('')}
-        </div>
-      </div>
-    </section>
-
-    <section class="page-section" id="home-catalog-section" style="background: #faf7f2; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-      <div class="container">
-        <div class="section-heading">
-          <p class="eyebrow">Rental Catalog</p>
-          <h2>Bespoke Props for Hire.</h2>
-          <p>Rent individual props to elevate your celebration. Prices are per day, subject to availability.</p>
-        </div>
-
-        <div class="filter-row" id="home-catalog-filter-row" style="margin-bottom: 2rem;">
-          ${EVENT_CATEGORIES.map((cat) => `<button class="filter-chip ${cat.slug === 'all' ? 'active' : ''}" type="button" data-catalog-filter="${cat.slug}">${cat.name}</button>`).join('')}
-        </div>
-
-        <div class="card-grid" id="home-prop-grid">
-          <!-- Dynamic products list will be injected here -->
         </div>
       </div>
     </section>
@@ -1317,45 +1335,7 @@ function initGalleryPage() {
   renderGallery();
 }
 
-function initGlobalSearch() {
-  const searchInput = document.getElementById('nav-search-input');
-  const clearBtn = document.getElementById('nav-search-clear');
-  if (!searchInput) return;
-
-  searchInput.addEventListener('input', () => {
-    const val = searchInput.value.trim();
-    if (clearBtn) {
-      clearBtn.style.display = val ? 'flex' : 'none';
-    }
-
-    const currentPage = getCurrentPage();
-    if (currentPage === 'home') {
-      renderHomeProps();
-    }
-  });
-
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const val = searchInput.value.trim();
-      const currentPage = getCurrentPage();
-      if (currentPage !== 'home') {
-        window.location.href = `index.html?search=${encodeURIComponent(val)}`;
-      }
-    }
-  });
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      clearBtn.style.display = 'none';
-      
-      const currentPage = getCurrentPage();
-      if (currentPage === 'home') {
-        renderHomeProps();
-      }
-    });
-  }
-}
+// initGlobalSearch was removed as navigation search was deprecated
 
 window.activeHomeCategory = 'all';
 window.activeHomeSearch = '';
@@ -1374,10 +1354,10 @@ function renderHomePropsList(items) {
     const resetBtn = document.getElementById('home-catalog-reset-search');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
-        const searchInput = document.getElementById('nav-search-input');
+        const searchInput = document.getElementById('home-search-input');
         if (searchInput) {
           searchInput.value = '';
-          const clearBtn = document.getElementById('nav-search-clear');
+          const clearBtn = document.getElementById('home-search-clear');
           if (clearBtn) clearBtn.style.display = 'none';
         }
         window.activeHomeCategory = 'all';
@@ -1393,20 +1373,16 @@ function renderHomePropsList(items) {
   }
 
   grid.innerHTML = items.map((item) => `
-    <article class="prop-card" style="background: white; border: 1px solid var(--border); border-radius: 1rem; overflow: hidden; display: flex; flex-direction: column; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <div class="card-image" style="position: relative; height: 240px; overflow: hidden;">
-        <img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;" onclick="window.openGlobalLightbox('${item.image}', '${item.name}')" />
-        <span class="product-tag-badge" style="position: absolute; top: 1rem; left: 1rem; background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: var(--burgundy); padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">${item.tag}</span>
-      </div>
-      <div class="card-body" style="padding: 1.25rem; display: flex; flex-direction: column; flex-grow: 1; gap: 0.75rem;">
-        <h3 style="font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--text); margin: 0; line-height: 1.4;">${item.name}</h3>
-        <div style="font-size: 1.15rem; font-weight: 600; color: var(--burgundy); display: flex; align-items: baseline; gap: 0.25rem;">
-          ₹ ${item.price.toLocaleString('en-IN')} <span style="font-size: 0.8rem; color: var(--muted); font-weight: 400;">/ day</span>
-        </div>
-        <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem;">
-          <a href="booking.html?product=${encodeURIComponent(item.name)}" class="btn btn-gold" style="flex: 1; padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 99px; text-align: center; display: flex; align-items: center; justify-content: center;">Book Now</a>
-          <a href="product-details.html?id=${item.id}" class="btn btn-outline" style="flex: 1; padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 99px; text-align: center; border: 1px solid var(--border); color: var(--text); background: transparent; display: flex; align-items: center; justify-content: center;">Details</a>
-        </div>
+    <article class="prop-card" style="position: relative; display: flex; flex-direction: column;">
+      <a href="product-details.html?id=${item.id}" class="card-image" style="display:block; height: 240px; overflow:hidden;">
+        <img src="${item.image}" alt="${item.name}" />
+      </a>
+      <button type="button" class="zoom-btn" onclick="window.openGlobalLightbox('${item.image}', '${item.name}')" style="position: absolute; top: 1rem; right: 1rem; border: none; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(4px); color: var(--burgundy); width: 2.2rem; height: 2.2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; transition: transform 0.2s ease; z-index: 10;" title="Zoom Image">🔍</button>
+      <div class="card-body" style="display: flex; flex-direction: column; flex-grow: 1; padding: 1.25rem;">
+        <div class="eyrow" style="font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; font-weight: 600;">${item.tag} ${item.eventCategory !== 'all' ? `• ${EVENT_CATEGORIES.find(c => c.slug === item.eventCategory)?.name || item.eventCategory}` : ''}</div>
+        <h3 style="margin-bottom: 0.5rem;"><a href="product-details.html?id=${item.id}" style="color: inherit; text-decoration: none;">${item.name}</a></h3>
+        <p style="font-weight: 500; color: var(--burgundy); margin-bottom: 1rem;">₹ ${item.price.toLocaleString('en-IN')} / day</p>
+        <a href="booking.html?product=${encodeURIComponent(item.name)}" class="btn btn-gold" style="margin-top: auto; width: 100%; text-align: center; display: block;">Book Now</a>
       </div>
     </article>
   `).join('');
@@ -1414,19 +1390,52 @@ function renderHomePropsList(items) {
 
 window.renderHomeProps = function() {
   const allProducts = loadProducts();
-  const searchInput = document.getElementById('nav-search-input');
+  const searchInput = document.getElementById('home-search-input');
   if (searchInput) {
     window.activeHomeSearch = searchInput.value.toLowerCase().trim();
-    const clearBtn = document.getElementById('nav-search-clear');
+    const clearBtn = document.getElementById('home-search-clear');
     if (clearBtn) {
       clearBtn.style.display = searchInput.value ? 'flex' : 'none';
     }
   }
 
   const filtered = allProducts.filter(item => {
-    const matchesCategory = window.activeHomeCategory === 'all' || item.eventCategory === window.activeHomeCategory;
-    const matchesSearch = !window.activeHomeSearch || item.name.toLowerCase().includes(window.activeHomeSearch) || (item.tag && item.tag.toLowerCase().includes(window.activeHomeSearch));
-    return matchesCategory && matchesSearch;
+    const matchesCategory = window.activeHomeCategory === 'all' || item.eventCategory === window.activeHomeCategory || item.eventCategory === 'all';
+    
+    const query = window.activeHomeSearch;
+    if (!query) return matchesCategory;
+
+    // Matches product name
+    const nameMatch = item.name.toLowerCase().includes(query);
+    // Matches product tag (e.g. Seating, Lighting, Backdrop, Tableware)
+    const tagMatch = (item.tag && item.tag.toLowerCase().includes(query));
+
+    // Matches event category name or mapping
+    const categorySlug = item.eventCategory;
+    const categoryObj = EVENT_CATEGORIES.find(c => c.slug === categorySlug);
+    const categoryName = categoryObj ? categoryObj.name.toLowerCase() : '';
+    
+    // Mapped terms for categories to support broad event name searches
+    const mappedTerms = [];
+    if (categorySlug === 'wedding') {
+      mappedTerms.push('wedding', 'weddings', 'reception', 'receptions');
+    } else if (categorySlug === 'birthday') {
+      mappedTerms.push('birthday', 'birthdays');
+    } else if (categorySlug === 'baby-shower') {
+      mappedTerms.push('baby shower', 'baby showers', 'babyshower');
+    } else if (categorySlug === 'engagement') {
+      mappedTerms.push('engagement', 'engagements');
+    } else if (categorySlug === 'corporate') {
+      mappedTerms.push('corporate', 'corporate event', 'corporate events');
+    } else if (categorySlug === 'haldi') {
+      mappedTerms.push('haldi', 'mehndi');
+    } else if (categorySlug === 'anniversary') {
+      mappedTerms.push('anniversary', 'anniversaries');
+    }
+
+    const catMatch = categoryName.includes(query) || (query && mappedTerms.some(term => query.includes(term) || term.includes(query)));
+
+    return matchesCategory && (nameMatch || tagMatch || catMatch);
   });
 
   renderHomePropsList(filtered);
@@ -1435,13 +1444,48 @@ window.renderHomeProps = function() {
 function initHomePage() {
   const urlParams = new URLSearchParams(window.location.search);
   const searchQuery = urlParams.get('search');
-  const searchInput = document.getElementById('nav-search-input');
+  const searchInput = document.getElementById('home-search-input');
   
   if (searchQuery && searchInput) {
     searchInput.value = searchQuery;
+    searchInput.focus();
+    const len = searchInput.value.length;
+    searchInput.setSelectionRange(len, len);
   }
 
   renderHomeProps();
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      renderHomeProps();
+    });
+
+    const clearBtn = document.getElementById('home-search-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearBtn.style.display = 'none';
+        renderHomeProps();
+      });
+    }
+  }
+
+  // Hook up suggestion chips
+  const suggestionChips = document.querySelectorAll('.suggestion-chip');
+  suggestionChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const suggestVal = chip.dataset.suggest;
+      if (searchInput) {
+        searchInput.value = suggestVal;
+        renderHomeProps();
+        // Smooth scroll to catalog section
+        const catalogSection = document.getElementById('home-catalog-section');
+        if (catalogSection) {
+          catalogSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    });
+  });
 
   const filterChips = document.querySelectorAll('[data-catalog-filter]');
   filterChips.forEach(chip => {
@@ -2245,7 +2289,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 window.addEventListener('storage', (event) => {
   if (
-    event.key === 'sky_decors_products_v2' || 
+    event.key === 'sky_decors_products_v3' || 
     event.key === 'sky_decors_testimonials_v2' || 
     event.key === 'sky_decors_bookings_v1'
   ) {
