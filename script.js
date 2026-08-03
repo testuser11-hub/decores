@@ -421,6 +421,16 @@ function getPageTitle(page) {
   return titles[page] || titles.home;
 }
 
+window.openGlobalLightbox = function(src, alt = 'Preview') {
+  const lightbox = document.getElementById('global-lightbox');
+  const img = document.getElementById('global-lightbox-image');
+  if (lightbox && img) {
+    img.src = src;
+    img.alt = alt;
+    lightbox.classList.remove('hidden');
+  }
+};
+
 function renderShell(content, skipHandlers = false) {
   document.title = getPageTitle(getCurrentPage());
   document.body.innerHTML = `
@@ -457,11 +467,28 @@ function renderShell(content, skipHandlers = false) {
         <a href="index.html">Back to top</a>
       </div>
     </footer>
+    <div class="lightbox hidden" id="global-lightbox" role="dialog" aria-modal="true">
+      <div class="lightbox-content">
+        <button class="lightbox-close" id="global-lightbox-close" type="button" aria-label="Close preview">×</button>
+        <img id="global-lightbox-image" src="" alt="Preview" />
+      </div>
+    </div>
   `;
 
   initMobileNav();
   if (!skipHandlers) {
     attachPageHandlers();
+  }
+
+  const globalLightbox = document.getElementById('global-lightbox');
+  const globalClose = document.getElementById('global-lightbox-close');
+  if (globalLightbox && globalClose) {
+    globalClose.addEventListener('click', () => globalLightbox.classList.add('hidden'));
+    globalLightbox.addEventListener('click', (e) => {
+      if (e.target === globalLightbox) {
+        globalLightbox.classList.add('hidden');
+      }
+    });
   }
 
   const navLogoutBtn = document.getElementById('nav-logout-btn');
@@ -517,7 +544,7 @@ function renderHomePage() {
         <div class="card-grid">
           ${categories.map((item) => `
             <article class="card">
-              <div class="card-image"><img src="${item.image}" alt="${item.name}" /></div>
+              <div class="card-image"><img src="${item.image}" alt="${item.name}" style="cursor: zoom-in;" onclick="window.openGlobalLightbox('${item.image}', '${item.name}')" /></div>
               <div class="card-body">
                 <h3>${item.name}</h3>
                 <p>${item.blurb}</p>
@@ -527,7 +554,7 @@ function renderHomePage() {
         </div>
       </div>
     </section>
-
+ 
     <section class="page-section section-alt">
       <div class="container process-grid">
         <div>
@@ -543,7 +570,7 @@ function renderHomePage() {
         </ol>
       </div>
     </section>
-
+ 
     <section class="page-section">
       <div class="container">
         <div class="section-heading">
@@ -552,7 +579,7 @@ function renderHomePage() {
         </div>
         <div class="gallery-grid">
           ${galleryItems.slice(0, 8).map((item) => `
-            <button class="gallery-card" type="button">
+            <button class="gallery-card" type="button" onclick="window.openGlobalLightbox('${item.image}', '${item.title}')">
               <div class="thumb"><img src="${item.image}" alt="${item.title}" /></div>
               <div class="gallery-title">${item.title}</div>
             </button>
@@ -623,12 +650,6 @@ function renderGalleryPage() {
         <div class="gallery-grid" id="gallery-grid"></div>
       </div>
     </section>
-    <div class="lightbox hidden" id="lightbox" role="dialog" aria-modal="true">
-      <div class="lightbox-content">
-        <button class="lightbox-close" id="lightbox-close" type="button" aria-label="Close preview">×</button>
-        <img id="lightbox-image" src="" alt="Preview" />
-      </div>
-    </div>
   `;
 }
 
@@ -1240,9 +1261,6 @@ function attachPageHandlers() {
 
 function initGalleryPage() {
   const grid = document.getElementById('gallery-grid');
-  const lightbox = document.getElementById('lightbox');
-  const lightboxImage = document.getElementById('lightbox-image');
-  const closeButton = document.getElementById('lightbox-close');
   const filters = Array.from(document.querySelectorAll('.filter-chip'));
 
   let activeFilter = 'all';
@@ -1268,16 +1286,7 @@ function initGalleryPage() {
   grid.addEventListener('click', (event) => {
     const card = event.target.closest('.gallery-card');
     if (!card) return;
-    lightboxImage.src = card.dataset.image;
-    lightboxImage.alt = card.dataset.title;
-    lightbox.classList.remove('hidden');
-  });
-
-  closeButton.addEventListener('click', () => lightbox.classList.add('hidden'));
-  lightbox.addEventListener('click', (event) => {
-    if (event.target === lightbox) {
-      lightbox.classList.add('hidden');
-    }
+    window.openGlobalLightbox(card.dataset.image, card.dataset.title);
   });
 
   renderGallery();
@@ -1940,7 +1949,7 @@ function renderProductDetailsPage() {
               <div class="slider-viewport" id="slider-viewport">
                 ${imagesList.map((url, idx) => `
                   <div class="slider-slide ${idx === 0 ? 'active' : ''}" data-index="${idx}">
-                    <img src="${url}" alt="${product.name} - View ${idx + 1}" />
+                    <img src="${url}" alt="${product.name} - View ${idx + 1}" style="cursor: zoom-in;" onclick="window.openGlobalLightbox('${url}', '${product.name} - View ${idx + 1}')" />
                   </div>
                 `).join('')}
               </div>
